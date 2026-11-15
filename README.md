@@ -2,7 +2,7 @@
 
 CaféClick es un proyecto final de Cómputo en la Nube para gestionar pedidos de una cafetería universitaria. El cliente (estudiante) consulta el menú, arma un carrito, confirma el pedido y sigue su preparación. El dueño de la cafetería, desde el panel de cocina, recibe pedidos y actualiza su estado hasta la entrega.
 
-**Estado** · El proyecto está en preparación. El backlog define la implementación y la guía de despliegue reúne las plantillas de configuración.
+**Estado** · El monorepo tiene la base de Nuxt y Express. El backlog define las funciones pendientes y la guía de despliegue reúne las plantillas de configuración.
 
 ## Alcance del MVP
 
@@ -18,7 +18,7 @@ CaféClick es un proyecto final de Cómputo en la Nube para gestionar pedidos de
 | Web (`apps/web/`) | Nuxt 4, Vue 3, TypeScript, Tailwind CSS y Pinia. Sitio estático en Netlify. |
 | API (`apps/api/`) | Node.js 22 y Express 5 con TypeScript. Expone operaciones REST para el catálogo y los pedidos, además del canal SSE. Render construye la imagen con `docker/api.Dockerfile`. |
 | Datos (`database/`) | PostgreSQL 17 en Render. Migraciones SQL versionadas en `database/migrations/` y datos de demostración en `database/seeds/`. |
-| Entorno local | Docker Compose inicia la web, la API y PostgreSQL. Ambos proyectos comparten el repositorio y los scripts de raíz mediante npm workspaces. |
+| Entorno local | Docker Compose iniciará la web, la API y PostgreSQL. Los dos proyectos comparten un workspace de pnpm y el archivo `pnpm-lock.yaml` en la raíz. |
 | Verificación y despliegue | GitHub Actions ejecutará lint, verificación de tipos, pruebas y compilación. Netlify y Render publicarán desde `main`. |
 
 ## Flujo de ramas
@@ -32,9 +32,15 @@ CaféClick es un proyecto final de Cómputo en la Nube para gestionar pedidos de
 1. Abre un PR de tu rama a `develop`, enlaza la issue y solicita la revisión del otro integrante. Integra cuando esté aprobado y pasen las verificaciones de GitHub Actions.
 2. Para liberar, abre un PR de `develop` a `main`. Tras integrarlo, verifica que Netlify y Render publiquen el mismo commit y que la web pública cargue el catálogo desde la API de producción.
 
-## Ejecución local prevista
+## Ejecución local
 
-Cuando estén disponibles `compose.yaml` y `.env.example`, sigue la [sección de Docker Compose](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) para configurar las variables, iniciar los tres servicios con `docker compose up --build` y cargar el catálogo de demo. La web usará `http://localhost:3000` y la API, `http://localhost:3001`. `GET /api/health` comprobará la conexión con PostgreSQL.
+Usa Node.js 22.22.3 o posterior en la serie 22 y pnpm 12.15.0. También se admite Node.js 24.15.0 o posterior en la serie 24. Desde la raíz instala ambos proyectos con `pnpm install --frozen-lockfile`.
+
+- `pnpm dev:web` inicia Nuxt en `http://localhost:3000`.
+- `pnpm dev:api` inicia Express en `http://localhost:3001`. Abre esa URL para ver el mensaje de arranque de la API.
+- `pnpm typecheck`, `pnpm build` y `pnpm test` verifican los tipos, generan los artefactos y ejecutan las pruebas disponibles.
+
+Cuando estén disponibles `compose.yaml` y `.env.example`, sigue la [sección de Docker Compose](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) para iniciar el entorno completo con PostgreSQL y cargar el catálogo de demo.
 
 ## Entrega académica
 
@@ -52,6 +58,7 @@ Fuente académica · *Cómputo en la Nube – Proyectos*, pp. 2–5 (requisitos 
 
 ## Documentación y seguimiento
 
-- [Backlog y criterios de aceptación](CafeClick-backlog.md)
+- [Contrato inicial de la API](docs/api.md)
+- [Backlog por semana](docs/backlog.md)
 - [Guía de integración y despliegue](CafeClick-guia-de-despliegue.md)
 - [Issues de GitHub](https://github.com/Jorge-solis04/CafeClick/issues)

@@ -1,6 +1,6 @@
 # CaféClick · Guía de integración y despliegue
 
-Esta guía acompaña las issues CC-01, CC-04, CC-05, CC-06, CC-11, CC-12 y CC-16. Los ejemplos usan un monorepo con npm workspaces, Node 22, PostgreSQL 17, Nuxt estático en Netlify y una API Express en Render. Son plantillas para el repositorio en construcción. Los nombres de scripts y salidas indicados abajo forman parte del contrato de configuración.
+Esta guía acompaña las issues CC-01, CC-04, CC-05, CC-06, CC-11, CC-12 y CC-16. Los ejemplos usan pnpm workspaces, Node 22.22.3 o posterior en la serie 22, PostgreSQL 17, Nuxt estático en Netlify y una API Express en Render. Son plantillas para el repositorio en construcción. Los nombres de scripts y salidas indicados abajo forman parte del contrato de configuración.
 
 ## 1. GitHub y GitHub Actions
 
@@ -19,7 +19,7 @@ Esta guía acompaña las issues CC-01, CC-04, CC-05, CC-06, CC-11, CC-12 y CC-16
 | `apps/api` | `build`, `start` | Compilan TypeScript y ejecutan la API compilada en `dist/server.js`. |
 | `apps/api` | `db:migrate`, `db:seed` | Ejecutan los scripts compilados usando `DATABASE_URL` y leen los archivos SQL versionados mediante `DATABASE_DIR` o un valor por defecto documentado. |
 
-Publicar `package-lock.json` en la raíz. Los dos manifiestos de workspace usados por los Dockerfiles deben existir y coincidir con el lockfile antes de compilar.
+Publicar `pnpm-lock.yaml` y `pnpm-workspace.yaml` en la raíz. Los dos manifiestos de workspace usados por los Dockerfiles deben existir y coincidir con el lockfile antes de compilar. Corepack usa la versión de pnpm fijada en `package.json`.
 
 ### `.github/workflows/ci.yml`
 
@@ -64,13 +64,13 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm run db:migrate --workspace apps/api
-      - run: npm test
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm --filter @cafeclick/api db:migrate
+      - run: pnpm test
       - run: docker build -f docker/api.Dockerfile .
 ```
 
@@ -83,27 +83,27 @@ Usar `process.env.PORT` y escuchar en `0.0.0.0` en Express. La API carga `DATABA
 ### `docker/api.Dockerfile`
 
 ```dockerfile
-FROM node:22-bookworm-slim AS build
+FROM node:22-bookworm-slim AS base
 WORKDIR /app
-COPY package.json package-lock.json ./
+ENV COREPACK_HOME=/opt/corepack
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
 COPY apps/api/package.json apps/api/
-RUN npm ci --workspace apps/api
-COPY apps/api/ apps/api/
-RUN npm run build --workspace apps/api
+RUN corepack enable && pnpm --version
 
-FROM node:22-bookworm-slim AS runtime
-WORKDIR /app
+FROM base AS build
+RUN pnpm --filter @cafeclick/api install --frozen-lockfile
+COPY apps/api/ apps/api/
+RUN pnpm --filter @cafeclick/api build
+
+FROM base AS runtime
 ENV NODE_ENV=production
 ENV DATABASE_DIR=/app/database
-COPY package.json package-lock.json ./
-COPY apps/web/package.json apps/web/
-COPY apps/api/package.json apps/api/
-RUN npm ci --omit=dev --workspace apps/api && npm cache clean --force
+RUN pnpm --filter @cafeclick/api install --prod --frozen-lockfile
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY database/ database/
 USER node
-CMD ["sh", "-c", "npm run db:migrate --workspace apps/api && exec node apps/api/dist/server.js"]
+CMD ["sh", "-c", "pnpm --filter @cafeclick/api db:migrate && exec node apps/api/dist/server.js"]
 ```
 
 ### `docker/web.Dockerfile`
@@ -111,15 +111,15 @@ CMD ["sh", "-c", "npm run db:migrate --workspace apps/api && exec node apps/api/
 ```dockerfile
 FROM node:22-bookworm-slim
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
 COPY apps/api/package.json apps/api/
-RUN npm ci --workspace apps/web
+RUN corepack enable && pnpm --filter @cafeclick/web install --frozen-lockfile
 COPY apps/web/ apps/web/
-CMD ["npm", "run", "dev", "--workspace", "apps/web", "--", "--host", "0.0.0.0"]
+CMD ["pnpm", "--filter", "@cafeclick/web", "dev", "--host", "0.0.0.0"]
 ```
 
-Si se incorpora `packages/shared`, incluir su manifiesto antes de `npm ci`, copiar sus fuentes o compilarlo según su contrato y garantizar que exista dentro de la imagen final si la API lo usa en runtime. Agregar a `.dockerignore` al menos `.git`, `**/node_modules`, `**/.nuxt`, `**/.output`, `**/dist` y `**/.env*`. Evitar que secretos del host entren al contexto.
+Si se incorpora `packages/shared`, incluir su manifiesto antes de `pnpm install`, copiar sus fuentes o compilarlo según su contrato y garantizar que exista dentro de la imagen final si la API lo usa en runtime. Agregar a `.dockerignore` al menos `.git`, `.pnpm-store`, `**/node_modules`, `**/.nuxt`, `**/.output`, `**/dist` y `**/.env*`. Evitar que secretos del host entren al contexto.
 
 ### `compose.yaml`
 
@@ -177,7 +177,7 @@ docker compose config --quiet
 docker compose up --build -d
 docker compose logs api
 curl -fsS http://localhost:3001/api/health
-docker compose exec api npm run db:seed --workspace apps/api
+docker compose exec api pnpm --filter @cafeclick/api db:seed
 curl -fsS http://localhost:3001/api/products
 ```
 
@@ -230,7 +230,7 @@ Configurar `ssr: false` en `apps/web/nuxt.config.ts` y declarar `runtimeConfig.p
 
 ```toml
 [build]
-  command = "npm run generate:web"
+  command = "pnpm generate:web"
   publish = "apps/web/.output/public"
 
 [build.environment]
@@ -242,7 +242,7 @@ Configurar `ssr: false` en `apps/web/nuxt.config.ts` y declarar `runtimeConfig.p
   status = 200
 ```
 
-1. Importar el repositorio en Netlify. Configurar `main` como rama de producción y mantener la raíz como base del build para que npm encuentre los workspaces y el lockfile. El ejemplo coloca `netlify.toml` en esa raíz.
+1. Importar el repositorio en Netlify. Configurar `main` como rama de producción y mantener la raíz como base del build para que Netlify detecte `pnpm-lock.yaml` y la versión de pnpm fijada en `package.json`. El ejemplo coloca `netlify.toml` en esa raíz.
 2. Definir `NUXT_PUBLIC_API_BASE=https://<servicio>.onrender.com` para el contexto de producción. Generar y desplegar con ese valor. Si la variable cambia, volver a desplegar.
 3. Configurar `WEB_ORIGIN=https://<sitio>.netlify.app` en Render, sin barra final. Verificar desde el navegador el catálogo, preflight de REST con `Authorization` y `Content-Type`, recarga de una ruta interna y stream SSE. El ejemplo usa el dominio de producción; si prueban Deploy Previews con API, autorizar sus orígenes explícitamente según el ambiente.
 4. Vincular las URLs públicas y guardar evidencia del sitio cargando datos reales. Comprobar en el log de build que Netlify ejecutó el comando de `netlify.toml`.

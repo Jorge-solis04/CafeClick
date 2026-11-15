@@ -4,6 +4,7 @@
 
 - CaféClick es el proyecto final de Cómputo en la Nube. El cliente crea y consulta sus pedidos. El dueño de la cafetería usa el rol de cocina para atenderlos.
 - La arquitectura prevista usa Nuxt 4 en `apps/web/`, Express 5 en `apps/api/` y PostgreSQL 17 con migraciones en `database/migrations/` y datos de demo en `database/seeds/`. Docker Compose se usa en local. Netlify publica la web y Render despliega la API desde su Dockerfile y aloja PostgreSQL.
+- Usa pnpm desde la raíz. `pnpm-workspace.yaml` define las apps y `pnpm-lock.yaml` fija sus dependencias.
 - Lee [README.md](README.md) para el alcance general, [el backlog](CafeClick-backlog.md) para criterios de aceptación y [la guía de despliegue](CafeClick-guia-de-despliegue.md) para configuración y comandos. Verifica qué archivos y scripts existen antes de usarlos.
 
 ## Reglas del pedido

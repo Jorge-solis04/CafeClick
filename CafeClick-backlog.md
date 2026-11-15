@@ -39,7 +39,7 @@ Ambos trabajan en frontend, backend e infraestructura. Cada uno conserva al meno
 **Criterios de aceptación**
 
 - [ ] Revisar el commit inicial en `main` y confirmar que es la rama por defecto. Crear `develop` desde `main`. Reservar `main` para despliegues.
-- [ ] Versionar los manifiestos npm workspaces y lockfile de raíz, `apps/web`, `apps/api`, `database/migrations`, `database/seeds`, `docker/` y `docs/` conforme se agreguen sus archivos.
+- [ ] Versionar `pnpm-workspace.yaml`, `pnpm-lock.yaml`, los manifiestos de raíz y de `apps/web` y `apps/api`, y los archivos en `database/migrations`, `database/seeds`, `docker/` y `docs/` conforme se agreguen.
 - [ ] Publicar `README.md` inicial y `docs/api.md` con el contrato del catálogo, pedidos y salud. Reservar `docs/backlog.md` para vincular las issues y milestones.
 - [ ] Exigir un PR revisado y el check de GitHub Actions en `develop` y `main` cuando el check esté disponible. Documentar el flujo en el README y vincular los PR a sus issues.
 
