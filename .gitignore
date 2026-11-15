@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+.npm-cache/
+.nuxt/
+.output/
+dist
+coverage/
+*.log
+.env
+.env.*
+!.env.example
