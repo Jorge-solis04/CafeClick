@@ -1,0 +1,21 @@
+name: cafeclick
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: cafeclick
+      POSTGRES_USER: cafeclick
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-demo}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "cafeclick", "-d", "cafeclick"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  postgres-data:

@@ -17,7 +17,7 @@ CaféClick es un proyecto final de Cómputo en la Nube para gestionar pedidos de
 | --- | --- |
 | Web (`apps/web/`) | Nuxt 4, Vue 3, TypeScript, Tailwind CSS y Pinia. Sitio estático en Netlify. |
 | API (`apps/api/`) | Node.js 22 y Express 5 con TypeScript. Expone operaciones REST para el catálogo y los pedidos, además del canal SSE. Render construye la imagen con `docker/api.Dockerfile`. |
-| Datos (`database/`) | PostgreSQL 17 en Render. Migraciones SQL versionadas en `database/migrations/` y datos de demostración en `database/seeds/`. |
+| Datos (`database/`) | PostgreSQL 17 con Drizzle ORM sobre `pg`. Las migraciones generadas se versionan en `database/migrations/` y los datos de demostración irán en `database/seeds/`. |
 | Entorno local | Docker Compose iniciará la web, la API y PostgreSQL. Los dos proyectos comparten un workspace de pnpm y el archivo `pnpm-lock.yaml` en la raíz. |
 | Verificación y despliegue | GitHub Actions ejecutará lint, verificación de tipos, pruebas y compilación. Netlify y Render publicarán desde `main`. |
 
@@ -40,7 +40,31 @@ Usa Node.js 22.22.3 o posterior en la serie 22 y pnpm 12.15.0. También se admit
 - `pnpm dev:web` y `pnpm dev:api` permiten iniciar una sola app. Abre la URL de Express para ver su mensaje de arranque.
 - `pnpm typecheck`, `pnpm build` y `pnpm test` verifican los tipos, generan los artefactos y ejecutan las pruebas disponibles.
 
-Cuando estén disponibles `compose.yaml` y `.env.example`, sigue la [sección de Docker Compose](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) para iniciar el entorno completo con PostgreSQL y cargar el catálogo de demo.
+### PostgreSQL local y migraciones
+
+Desde la raíz, copia `.env.example` a `.env`, inicia PostgreSQL 17 en Docker y aplica el esquema con Drizzle:
+
+```bash
+cp -i .env.example .env
+docker compose up -d --wait db
+pnpm --filter @cafeclick/api build
+pnpm --filter @cafeclick/api db:migrate
+```
+
+`POSTGRES_PASSWORD` inicializa la contraseña del usuario `cafeclick` y `POSTGRES_PORT` fija el puerto local. `db:migrate` lee `DATABASE_URL` desde el `.env` raíz. Si cambias el puerto o la contraseña, actualiza también la URL. Para un volumen ya inicializado, cambia la contraseña en PostgreSQL antes de actualizar el archivo. `.env` queda ignorado por Git.
+
+Docker administra el volumen `postgres-data`. `docker compose stop db` detiene PostgreSQL y conserva los datos. Los valores de la plantilla son para desarrollo local. Dentro de Compose, los servicios usarán `db:5432`.
+
+Para cambiar el esquema, edita `apps/api/src/database/schema.ts` y ejecuta `pnpm --filter @cafeclick/api db:generate --name describe_change`. Revisa y versiona el SQL y los metadatos que genere Drizzle en `database/migrations/`. `db:migrate` aplica únicamente archivos pendientes. Si `DATABASE_DIR` está definida, usa `migrations/` dentro de esa ruta.
+
+Para comprobar las migraciones, usa la instancia local de Docker. La prueba crea y elimina una base temporal con el usuario de desarrollo:
+
+```bash
+TEST_DATABASE_URL='postgresql://cafeclick:local-demo@127.0.0.1:55432/cafeclick' \
+  pnpm --filter @cafeclick/api exec tsx --test test/migrations.test.ts
+```
+
+La [guía de despliegue](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) describe cómo extender Compose con la web y la API en CC-04.
 
 ## Entrega académica
 
