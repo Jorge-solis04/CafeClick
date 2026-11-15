@@ -17,6 +17,7 @@ Esta guía acompaña las issues CC-01, CC-04, CC-05, CC-06, CC-11, CC-12 y CC-16
 | Raíz | `generate:web` | Ejecuta `nuxt generate` mediante el workspace web. |
 | `apps/web` | `dev`, `generate` | Ejecutan `nuxt dev` y `nuxt generate`. |
 | `apps/api` | `build`, `start` | Compilan TypeScript y ejecutan la API compilada en `dist/server.js`. |
+| `apps/api` | `db:generate` | Genera SQL y metadatos a partir del esquema de Drizzle. |
 | `apps/api` | `db:migrate`, `db:seed` | Ejecutan los scripts compilados usando `DATABASE_URL` y leen los archivos SQL versionados mediante `DATABASE_DIR` o un valor por defecto documentado. |
 
 Publicar `pnpm-lock.yaml` y `pnpm-workspace.yaml` en la raíz. Los dos manifiestos de workspace usados por los Dockerfiles deben existir y coincidir con el lockfile antes de compilar. Corepack usa la versión de pnpm fijada en `package.json`.
@@ -55,6 +56,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://cafeclick:ci-only@127.0.0.1:5432/cafeclick_test
+      TEST_DATABASE_URL: postgresql://cafeclick:ci-only@127.0.0.1:5432/cafeclick_test
       DATABASE_DIR: ${{ github.workspace }}/database
       NUXT_PUBLIC_API_BASE: http://localhost:3001
       WEB_ORIGIN: http://localhost:3000
@@ -123,21 +125,27 @@ Si se incorpora `packages/shared`, incluir su manifiesto antes de `pnpm install`
 
 ### `compose.yaml`
 
+El archivo actual inicia solo `db`. Esta plantilla añade `api` y `web` para CC-04.
+
 ```yaml
+name: cafeclick
+
 services:
   db:
     image: postgres:17
     environment:
       POSTGRES_DB: cafeclick
       POSTGRES_USER: cafeclick
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copia .env.example a .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-demo}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cafeclick -d cafeclick"]
-      interval: 5s
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "cafeclick", "-d", "cafeclick"]
+      interval: 3s
       timeout: 3s
-      retries: 10
+      retries: 15
 
   api:
     build:
@@ -145,7 +153,7 @@ services:
       dockerfile: docker/api.Dockerfile
     environment:
       PORT: "3001"
-      DATABASE_URL: ${DATABASE_URL:?Configura DATABASE_URL en .env}
+      DATABASE_URL: postgresql://cafeclick:${POSTGRES_PASSWORD:-local-demo}@db:5432/cafeclick
       WEB_ORIGIN: http://localhost:3000
       AUTH_SECRET: ${AUTH_SECRET:?Configura AUTH_SECRET en .env}
     depends_on:
@@ -167,10 +175,10 @@ volumes:
   postgres-data:
 ```
 
-En `.env.example`, incluir los nombres requeridos y valores de ejemplo para uso local, como `POSTGRES_PASSWORD=local-demo` y `DATABASE_URL=postgresql://cafeclick:local-demo@db:5432/cafeclick`. Dejar `AUTH_SECRET=` para que cada persona genere su valor. Documentar en el README cómo abrir la app y sembrar el entorno.
+El `DATABASE_URL` de `.env.example` apunta al puerto publicado para migrar desde la terminal. La API de esta plantilla se ejecuta dentro de Compose y se conecta a `db:5432`. Al agregar el servicio `api`, configura también `AUTH_SECRET` en `.env`.
 
 ```bash
-cp .env.example .env
+cp -i .env.example .env
 openssl rand -hex 32
 # Agrega el valor generado a AUTH_SECRET en .env.
 docker compose config --quiet
