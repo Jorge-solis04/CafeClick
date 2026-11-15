@@ -6,6 +6,7 @@
     "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
+    "dev": "pnpm -r --parallel run dev",
     "dev:web": "pnpm --filter @cafeclick/web dev",
     "dev:api": "pnpm --filter @cafeclick/api dev",
     "generate:web": "pnpm --filter @cafeclick/web generate",

@@ -36,8 +36,8 @@ CaféClick es un proyecto final de Cómputo en la Nube para gestionar pedidos de
 
 Usa Node.js 22.22.3 o posterior en la serie 22 y pnpm 12.15.0. También se admite Node.js 24.15.0 o posterior en la serie 24. Desde la raíz instala ambos proyectos con `pnpm install --frozen-lockfile`.
 
-- `pnpm dev:web` inicia Nuxt en `http://localhost:3000`.
-- `pnpm dev:api` inicia Express en `http://localhost:3001`. Abre esa URL para ver el mensaje de arranque de la API.
+- `pnpm dev` inicia Nuxt en `http://localhost:3000` y Express en `http://localhost:3001` desde una sola terminal. Pulsa `Ctrl+C` para detener ambos.
+- `pnpm dev:web` y `pnpm dev:api` permiten iniciar una sola app. Abre la URL de Express para ver su mensaje de arranque.
 - `pnpm typecheck`, `pnpm build` y `pnpm test` verifican los tipos, generan los artefactos y ejecutan las pruebas disponibles.
 
 Cuando estén disponibles `compose.yaml` y `.env.example`, sigue la [sección de Docker Compose](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) para iniciar el entorno completo con PostgreSQL y cargar el catálogo de demo.
