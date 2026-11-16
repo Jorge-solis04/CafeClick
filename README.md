@@ -65,9 +65,26 @@ DEMO_CUSTOMER_PASSWORD='elige-una-contraseña' DEMO_KITCHEN_PASSWORD='elige-otra
   pnpm --filter @cafeclick/api db:seed:accounts
 ```
 
-`db:seed` ejecuta en orden los archivos SQL de `database/seeds/` dentro de una transacción. Solo agrega los productos que faltan, por lo que se puede repetir. Si `DATABASE_DIR` está definida, usa `seeds/` dentro de esa ruta.
+`db:seed` ejecuta en orden los archivos SQL de `database/seeds/` dentro de una transacción. El nombre de cada producto es único en PostgreSQL y el seed omite los que ya existen, por lo que se puede repetir. Si `DATABASE_DIR` está definida, usa `seeds/` dentro de esa ruta.
 
-`db:seed:accounts` crea o actualiza las cuentas `cliente@cafeclick.test` (rol cliente) y `cocina@cafeclick.test` (rol cocina). Las contraseñas no se versionan: se leen de `DEMO_CUSTOMER_PASSWORD` y `DEMO_KITCHEN_PASSWORD`, deben tener al menos 8 caracteres y se guardan con hash scrypt. `DEMO_CUSTOMER_EMAIL` y `DEMO_KITCHEN_EMAIL` permiten cambiar los correos. Al volver a ejecutarlo, se reemplaza la contraseña de cada cuenta.
+`db:seed:accounts` crea o actualiza las cuentas `cliente@cafeclick.test` (rol cliente) y `cocina@cafeclick.test` (rol cocina). Las contraseñas no se versionan: se leen de `DEMO_CUSTOMER_PASSWORD` y `DEMO_KITCHEN_PASSWORD`, deben tener entre 8 caracteres y 72 bytes y se guardan con hash bcrypt. `DEMO_CUSTOMER_EMAIL` y `DEMO_KITCHEN_EMAIL` permiten cambiar los correos. Al volver a ejecutarlo, se reemplaza la contraseña de cada cuenta.
+
+Dentro de Docker Compose, el servicio `api` no recibe las contraseñas de demo, así que se pasan al ejecutar el seed:
+
+```bash
+docker compose exec api pnpm --filter @cafeclick/api db:seed
+docker compose exec -e DEMO_CUSTOMER_PASSWORD='elige-una-contraseña' -e DEMO_KITCHEN_PASSWORD='elige-otra-contraseña' \
+  api pnpm --filter @cafeclick/api db:seed:accounts
+```
+
+En Render, los seeds se ejecutan desde tu máquina con la URL externa de PostgreSQL, que exige TLS. Compila antes, porque los seeds usan `dist/`. La variable definida en el comando tiene prioridad sobre el `.env` local:
+
+```bash
+pnpm --filter @cafeclick/api build
+DATABASE_URL='<url-externa-de-render>?sslmode=require' pnpm --filter @cafeclick/api db:seed
+DATABASE_URL='<url-externa-de-render>?sslmode=require' DEMO_CUSTOMER_PASSWORD='...' DEMO_KITCHEN_PASSWORD='...' \
+  pnpm --filter @cafeclick/api db:seed:accounts
+```
 
 Con PostgreSQL disponible, `pnpm dev:api` lee `DATABASE_URL` del `.env` raíz. `GET /api/health` responde `200` si la API puede consultar PostgreSQL y `GET /api/products` devuelve el catálogo. El [contrato de la API](docs/api.md) describe las respuestas.
 

@@ -12,7 +12,5 @@ FROM (VALUES
   (9, 'Bagel con queso crema', 52.00),
   (10, 'Sándwich de jamón y queso', 65.00)
 ) AS catalog (menu_position, name, price)
-WHERE NOT EXISTS (
-  SELECT 1 FROM products WHERE products.name = catalog.name
-)
-ORDER BY catalog.menu_position;
+ORDER BY catalog.menu_position
+ON CONFLICT (name) DO NOTHING;

@@ -1,40 +1,32 @@
-import { randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from 'node:crypto'
+import { compare, hash, truncates } from 'bcryptjs'
 
-const hashAlgorithm = 'scrypt'
-const keyLength = 64
-const saltLength = 16
-const defaultOptions = { N: 16384, r: 8, p: 1 }
+const costFactor = 12
+export const maximumPasswordBytes = 72
 
-function deriveKey(password: string, salt: Buffer, options: ScryptOptions) {
-  return new Promise<Buffer>((resolve, reject) => {
-    scrypt(password.normalize('NFKC'), salt, keyLength, options, (error, key) => {
-      if (error) {
-        reject(error)
-        return
-      }
+function normalizePassword(password: string) {
+  return password.normalize('NFKC')
+}
 
-      resolve(key)
-    })
-  })
+export function exceedsPasswordByteLimit(password: string) {
+  return truncates(normalizePassword(password))
 }
 
 export async function hashPassword(password: string) {
-  const salt = randomBytes(saltLength)
-  const key = await deriveKey(password, salt, defaultOptions)
-  const { N, r, p } = defaultOptions
+  if (exceedsPasswordByteLimit(password)) {
+    throw new Error(`Passwords cannot exceed ${maximumPasswordBytes} bytes`)
+  }
 
-  return [hashAlgorithm, N, r, p, salt.toString('base64'), key.toString('base64')].join('$')
+  return hash(normalizePassword(password), costFactor)
 }
 
 export async function verifyPassword(password: string, passwordHash: string) {
-  const [algorithm, N, r, p, salt, expectedKey] = passwordHash.split('$')
-
-  if (algorithm !== hashAlgorithm || !salt || !expectedKey) {
+  if (exceedsPasswordByteLimit(password)) {
     return false
   }
 
-  const expected = Buffer.from(expectedKey, 'base64')
-  const actual = await deriveKey(password, Buffer.from(salt, 'base64'), { N: Number(N), r: Number(r), p: Number(p) })
-
-  return expected.length === actual.length && timingSafeEqual(expected, actual)
+  try {
+    return await compare(normalizePassword(password), passwordHash)
+  } catch {
+    return false
+  }
 }

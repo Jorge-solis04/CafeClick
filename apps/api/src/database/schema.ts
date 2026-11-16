@@ -13,7 +13,7 @@ export const users = pgTable('users', {
 
 export const products = pgTable('products', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: text().notNull(),
+  name: text().notNull().unique(),
   price: numeric({ precision: 12, scale: 2 }).notNull(),
 }, (table) => [
   check('products_price_valid', sql`${table.price} >= 0 AND ${table.price} <> 'NaN'::numeric`),

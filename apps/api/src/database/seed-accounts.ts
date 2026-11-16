@@ -1,3 +1,4 @@
+import { exceedsPasswordByteLimit, maximumPasswordBytes } from '../auth/password.js'
 import { seedDemoAccounts, type DemoAccount } from './seeds.js'
 
 const minimumPasswordLength = 8
@@ -12,6 +13,10 @@ function requiredPassword(variableName: string) {
 
   if (!password || password.length < minimumPasswordLength) {
     throw new Error(`${variableName} must contain at least ${minimumPasswordLength} characters`)
+  }
+
+  if (exceedsPasswordByteLimit(password)) {
+    throw new Error(`${variableName} cannot exceed ${maximumPasswordBytes} bytes`)
   }
 
   return password
