@@ -8,6 +8,13 @@
       "when": 1794758669919,
       "tag": "0000_create_order_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794853896330,
+      "tag": "0001_add_products_name_unique",
+      "breakpoints": true
     }
   ]
 }
