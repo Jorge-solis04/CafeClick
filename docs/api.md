@@ -6,8 +6,8 @@ La API de desarrollo escucha en `http://localhost:3001`. La ruta `GET /` respond
 
 | Método y ruta | Acceso | Respuesta exitosa |
 | --- | --- | --- |
-| `GET /api/health` | Público | `200` con `{"status":"ok"}` si la API puede consultar PostgreSQL. Si falla la conexión, devuelve `503`. |
-| `GET /api/products` | Público | `200` con `{"products":[...]}`. Un catálogo vacío devuelve `{"products":[]}`. |
+| `GET /api/health` | Público | `200` con `{"status":"ok"}` si la API puede consultar PostgreSQL. Si falla la conexión, devuelve `503` con el error `database_unavailable`. |
+| `GET /api/products` | Público | `200` con `{"products":[...]}`, ordenados por `id`. Un catálogo vacío devuelve `{"products":[]}`. |
 | `POST /api/orders` | Cliente | `201` con `{"order":{...}}` y estado inicial `pending`. |
 | `GET /api/orders` | Cliente o cocina | `200` con `{"orders":[...]}`, de más reciente a más antiguo. El cliente recibe solo sus pedidos. Cocina recibe los pedidos para el panel. |
 | `PATCH /api/orders/:id/status` | Cocina | `200` con `{"order":{...}}` después de aplicar la transición. |
@@ -16,11 +16,15 @@ Las rutas privadas reciben `Authorization: Bearer <token>`. Los IDs y las cantid
 
 ## Catálogo
 
+Cada producto incluye solo `id`, `name` y `price`. El precio es una cadena decimal con dos dígitos.
+
 ```json
 {
   "products": [{ "id": 1, "name": "Café americano", "price": "42.50" }]
 }
 ```
+
+El catálogo de demo está en `database/seeds/` y se carga con `db:seed`. El seed solo inserta los productos cuyo nombre todavía no existe, así que puede ejecutarse varias veces sin duplicar datos ni cambiar precios ya guardados.
 
 ## Pedidos
 
@@ -63,4 +67,5 @@ Para avanzar un pedido pendiente, cocina envía `{"status":"preparing"}` a `PATC
 | `403` | La sesión es válida, pero el rol carece de acceso a la operación. |
 | `404` | El pedido solicitado no existe. |
 | `409` | El cambio de estado no corresponde al siguiente paso o el pedido ya fue entregado. |
-| `503` | La comprobación de PostgreSQL en `/api/health` falló. |
+| `500` | Error inesperado, por ejemplo si PostgreSQL deja de responder durante una consulta. El código es `internal_error`. |
+| `503` | La comprobación de PostgreSQL en `/api/health` falló. El código es `database_unavailable`. |

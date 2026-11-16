@@ -55,14 +55,32 @@ pnpm --filter @cafeclick/api db:migrate
 
 Docker administra el volumen `postgres-data`. `docker compose stop db` detiene PostgreSQL y conserva los datos. Los valores de la plantilla son para desarrollo local. Dentro de Compose, los servicios usarán `db:5432`.
 
+### Datos de demo
+
+Con las migraciones aplicadas, carga el catálogo de demo y, cuando necesites iniciar sesión, las cuentas de prueba:
+
+```bash
+pnpm --filter @cafeclick/api db:seed
+DEMO_CUSTOMER_PASSWORD='elige-una-contraseña' DEMO_KITCHEN_PASSWORD='elige-otra-contraseña' \
+  pnpm --filter @cafeclick/api db:seed:accounts
+```
+
+`db:seed` ejecuta en orden los archivos SQL de `database/seeds/` dentro de una transacción. Solo agrega los productos que faltan, por lo que se puede repetir. Si `DATABASE_DIR` está definida, usa `seeds/` dentro de esa ruta.
+
+`db:seed:accounts` crea o actualiza las cuentas `cliente@cafeclick.test` (rol cliente) y `cocina@cafeclick.test` (rol cocina). Las contraseñas no se versionan: se leen de `DEMO_CUSTOMER_PASSWORD` y `DEMO_KITCHEN_PASSWORD`, deben tener al menos 8 caracteres y se guardan con hash scrypt. `DEMO_CUSTOMER_EMAIL` y `DEMO_KITCHEN_EMAIL` permiten cambiar los correos. Al volver a ejecutarlo, se reemplaza la contraseña de cada cuenta.
+
+Con PostgreSQL disponible, `pnpm dev:api` lee `DATABASE_URL` del `.env` raíz. `GET /api/health` responde `200` si la API puede consultar PostgreSQL y `GET /api/products` devuelve el catálogo. El [contrato de la API](docs/api.md) describe las respuestas.
+
 Para cambiar el esquema, edita `apps/api/src/database/schema.ts` y ejecuta `pnpm --filter @cafeclick/api db:generate --name describe_change`. Revisa y versiona el SQL y los metadatos que genere Drizzle en `database/migrations/`. `db:migrate` aplica únicamente archivos pendientes. Si `DATABASE_DIR` está definida, usa `migrations/` dentro de esa ruta.
 
 Para comprobar las migraciones, usa la instancia local de Docker. La prueba crea y elimina una base temporal con el usuario de desarrollo:
 
 ```bash
 TEST_DATABASE_URL='postgresql://cafeclick:local-demo@127.0.0.1:55432/cafeclick' \
-  pnpm --filter @cafeclick/api exec tsx --test test/migrations.test.ts
+  pnpm --filter @cafeclick/api exec tsx --test test/migrations.test.ts test/catalog.test.ts
 ```
+
+`test/catalog.test.ts` comprueba `/api/health`, `/api/products` y los dos seeds sobre una base temporal.
 
 La [guía de despliegue](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) describe cómo extender Compose con la web y la API en CC-04.
 

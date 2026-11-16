@@ -1,9 +1,48 @@
-import express from 'express'
+import { asc } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import express, { type ErrorRequestHandler } from 'express'
+import type { Pool } from 'pg'
+import { products } from './database/schema.js'
 
-export const app = express()
+const handleUnexpectedError: ErrorRequestHandler = (error, _request, response, _next) => {
+  console.error(error)
+  response.status(500).json({
+    error: { code: 'internal_error', message: 'Ocurrió un error inesperado.' },
+  })
+}
 
-app.disable('x-powered-by')
+export function createApp(pool: Pool) {
+  const database = drizzle(pool)
+  const app = express()
 
-app.get('/', (_request, response) => {
-  response.json({ message: 'CaféClick API is running' })
-})
+  app.disable('x-powered-by')
+
+  app.get('/', (_request, response) => {
+    response.json({ message: 'CaféClick API is running' })
+  })
+
+  app.get('/api/health', async (_request, response) => {
+    try {
+      await pool.query('SELECT 1')
+      response.json({ status: 'ok' })
+    } catch (error) {
+      console.error('PostgreSQL health check failed', error)
+      response.status(503).json({
+        error: { code: 'database_unavailable', message: 'La API no puede consultar PostgreSQL.' },
+      })
+    }
+  })
+
+  app.get('/api/products', async (_request, response) => {
+    const catalog = await database
+      .select({ id: products.id, name: products.name, price: products.price })
+      .from(products)
+      .orderBy(asc(products.id))
+
+    response.json({ products: catalog })
+  })
+
+  app.use(handleUnexpectedError)
+
+  return app
+}
