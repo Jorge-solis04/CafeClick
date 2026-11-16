@@ -87,7 +87,11 @@ test('health and catalog routes read real PostgreSQL data', async (context) => {
     assert.ok(Number.isInteger(product.id) && product.id > 0)
     assert.match(product.price, /^\d+\.\d{2}$/)
   }
-  assert.ok(products.some((product) => product.name === 'Café americano' && product.price === '42.50'))
+  assert.deepEqual(products.slice(0, 2), [
+    { id: products[0]?.id, name: 'Café americano', price: '42.50' },
+    { id: products[1]?.id, name: 'Café de olla', price: '38.00' },
+  ])
+  assert.equal(products.at(-1)?.name, 'Sándwich de jamón y queso')
 })
 
 test('demo account seed stores hashed passwords and can be rerun', async (context) => {
