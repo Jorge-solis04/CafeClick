@@ -40,6 +40,10 @@ Usa Node.js 22.22.3 o posterior en la serie 22 y pnpm 12.15.0. También se admit
 - `pnpm dev:web` y `pnpm dev:api` permiten iniciar una sola app. Abre la URL de Express para ver su mensaje de arranque.
 - `pnpm typecheck`, `pnpm build` y `pnpm test` verifican los tipos, generan los artefactos y ejecutan las pruebas disponibles.
 
+### Web y API en local
+
+La web consulta la API en `/api`. Con `pnpm dev`, Nuxt reenvía esas solicitudes a `http://localhost:3001`, así que en local no hace falta configurar CORS. Para un build publicado, define `NUXT_PUBLIC_API_BASE` con la URL pública de la API antes de generar el sitio.
+
 ### PostgreSQL local y migraciones
 
 Desde la raíz, copia `.env.example` a `.env`, inicia PostgreSQL 17 en Docker y aplica el esquema con Drizzle:
