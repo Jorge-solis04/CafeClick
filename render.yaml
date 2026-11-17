@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: cafeclick-api
+    runtime: docker
+    plan: free
+    branch: main
+    autoDeployTrigger: checksPass
+    dockerContext: .
+    dockerfilePath: ./docker/api.Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cafeclick-db
+          property: connectionString
+      - key: WEB_ORIGIN
+        sync: false
+
+databases:
+  - name: cafeclick-db
+    plan: free
+    postgresMajorVersion: "17"

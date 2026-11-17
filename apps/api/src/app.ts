@@ -1,3 +1,4 @@
+import cors from 'cors'
 import { asc } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import express, { type ErrorRequestHandler } from 'express'
@@ -11,11 +12,19 @@ const handleUnexpectedError: ErrorRequestHandler = (error, _request, response, _
   })
 }
 
-export function createApp(pool: Pool) {
+export function createApp(pool: Pool, webOrigin?: string) {
   const database = drizzle(pool)
   const app = express()
 
   app.disable('x-powered-by')
+
+  if (webOrigin) {
+    app.use('/api', cors({
+      origin: [new URL(webOrigin).origin],
+      methods: ['GET', 'HEAD'],
+      allowedHeaders: ['Authorization', 'Content-Type'],
+    }))
+  }
 
   app.get('/', (_request, response) => {
     response.json({ message: 'CaféClick API is running' })

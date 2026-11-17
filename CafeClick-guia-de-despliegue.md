@@ -1,10 +1,10 @@
 # CaféClick · Guía de integración y despliegue
 
-Esta guía acompaña las issues CC-01, CC-04, CC-05, CC-06, CC-11, CC-12 y CC-16. Los ejemplos usan pnpm workspaces, Node 22.22.3 o posterior en la serie 22, PostgreSQL 17, Nuxt estático en Netlify y una API Express en Render. Son plantillas para el repositorio en construcción. Los nombres de scripts y salidas indicados abajo forman parte del contrato de configuración.
+Esta guía acompaña las issues CC-01, CC-04, CC-05, CC-06, CC-11, CC-12 y CC-16. Los ejemplos usan pnpm workspaces, Node 22.22.3 o posterior en la serie 22, PostgreSQL 17, Nuxt estático en Netlify y una API Express en Render. Las secciones siguientes documentan la configuración versionada y los pasos para publicar.
 
 ## 1. GitHub y GitHub Actions
 
-1. Crear el repositorio con un commit inicial en `main`. Crear `develop` desde `main` y subir ambas ramas.
+1. GitHub Actions ejecuta CI en PR a `develop` y `main`, y en cada push a `main`.
 2. Abrir ramas como `feature/cc-03-menu-carrito` desde `develop`. Abrir PR a `develop`, referenciar la issue y pedir revisión al compañero. Liberar con un PR de `develop` a `main`.
 3. Una vez que GitHub muestre el check `Validar proyecto`, configurar en **Settings → Rules → Rulesets** o en **Settings → Branches** que ambas ramas requieran PR, una aprobación y ese check. Si el plan del repositorio privado no permite exigirlo, mantener la regla mediante revisión manual y guardar evidencias. Las reglas de GitHub dependen del plan y la visibilidad.
 4. Guardar el enlace a los PR, revisiones, corridas de CI y deploys ligados al mismo commit. Con esta configuración, GitHub Actions valida los cambios. Netlify y Render publican por su integración con GitHub.
@@ -22,213 +22,46 @@ Esta guía acompaña las issues CC-01, CC-04, CC-05, CC-06, CC-11, CC-12 y CC-16
 
 Publicar `pnpm-lock.yaml` y `pnpm-workspace.yaml` en la raíz. Los dos manifiestos de workspace usados por los Dockerfiles deben existir y coincidir con el lockfile antes de compilar. Corepack usa la versión de pnpm fijada en `package.json`.
 
-### `.github/workflows/ci.yml`
+### Flujo de validación
 
-```yaml
-name: CI
-
-on:
-  pull_request:
-    branches: [develop, main]
-  push:
-    branches: [main]
-
-permissions:
-  contents: read
-
-jobs:
-  validate:
-    name: Validar proyecto
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: cafeclick
-          POSTGRES_PASSWORD: ci-only
-          POSTGRES_DB: cafeclick_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U cafeclick -d cafeclick_test"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://cafeclick:ci-only@127.0.0.1:5432/cafeclick_test
-      TEST_DATABASE_URL: postgresql://cafeclick:ci-only@127.0.0.1:5432/cafeclick_test
-      DATABASE_DIR: ${{ github.workspace }}/database
-      NUXT_PUBLIC_API_BASE: http://localhost:3001
-      WEB_ORIGIN: http://localhost:3000
-      AUTH_SECRET: cafeclick-ci-only-ephemeral-signing-key
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-      - run: corepack enable
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm build
-      - run: pnpm --filter @cafeclick/api db:migrate
-      - run: pnpm test
-      - run: docker build -f docker/api.Dockerfile .
-```
-
-La contraseña del ejemplo solo pertenece al PostgreSQL efímero del runner. Si las pruebas de integración necesitan datos, cargarlos como fixtures dentro de las pruebas o con un seed de CI explícito. El comando final comprueba que el Dockerfile de Render compila usando el mismo contexto de raíz.
+El [workflow de CI](.github/workflows/ci.yml) instala pnpm con Corepack y usa el lockfile. Ejecuta lint, verificación de tipos, pruebas y compilación. Las pruebas de catálogo y migraciones crean sus propias bases temporales en el PostgreSQL 17 del runner, usando `TEST_DATABASE_URL`. Los últimos pasos validan Compose y construyen la misma imagen de API que usa Render.
 
 ## 2. Docker y Docker Compose
 
-Usar `process.env.PORT` y escuchar en `0.0.0.0` en Express. La API carga `DATABASE_URL` y `WEB_ORIGIN` por variables de entorno. El navegador local accede a `http://localhost:3001`; el nombre `db` solo se resuelve dentro de la red de Compose.
+[Compose](compose.yaml) construye la [imagen de API](docker/api.Dockerfile) y la [imagen web](docker/web.Dockerfile) desde la raíz. La API espera a que PostgreSQL acepte conexiones en `db:5432`. Su contenedor aplica las migraciones antes de arrancar Express y pasa la verificación de salud cuando `/api/health` puede consultar PostgreSQL. Nuxt reenvía `/api` a `api:3001` dentro de la red de Compose.
 
-### `docker/api.Dockerfile`
-
-```dockerfile
-FROM node:22-bookworm-slim AS base
-WORKDIR /app
-ENV COREPACK_HOME=/opt/corepack
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json apps/web/
-COPY apps/api/package.json apps/api/
-RUN corepack enable && pnpm --version
-
-FROM base AS build
-RUN pnpm --filter @cafeclick/api install --frozen-lockfile
-COPY apps/api/ apps/api/
-RUN pnpm --filter @cafeclick/api build
-
-FROM base AS runtime
-ENV NODE_ENV=production
-ENV DATABASE_DIR=/app/database
-RUN pnpm --filter @cafeclick/api install --prod --frozen-lockfile
-COPY --from=build /app/apps/api/dist apps/api/dist
-COPY database/ database/
-USER node
-CMD ["sh", "-c", "pnpm --filter @cafeclick/api db:migrate && exec node apps/api/dist/server.js"]
-```
-
-### `docker/web.Dockerfile`
-
-```dockerfile
-FROM node:22-bookworm-slim
-WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json apps/web/
-COPY apps/api/package.json apps/api/
-RUN corepack enable && pnpm --filter @cafeclick/web install --frozen-lockfile
-COPY apps/web/ apps/web/
-CMD ["pnpm", "--filter", "@cafeclick/web", "dev", "--host", "0.0.0.0"]
-```
-
-Si se incorpora `packages/shared`, incluir su manifiesto antes de `pnpm install`, copiar sus fuentes o compilarlo según su contrato y garantizar que exista dentro de la imagen final si la API lo usa en runtime. Agregar a `.dockerignore` al menos `.git`, `.pnpm-store`, `**/node_modules`, `**/.nuxt`, `**/.output`, `**/dist` y `**/.env*`. Evitar que secretos del host entren al contexto.
-
-### `compose.yaml`
-
-El archivo actual inicia solo `db`. Esta plantilla añade `api` y `web` para CC-04.
-
-```yaml
-name: cafeclick
-
-services:
-  db:
-    image: postgres:17
-    environment:
-      POSTGRES_DB: cafeclick
-      POSTGRES_USER: cafeclick
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-demo}
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "cafeclick", "-d", "cafeclick"]
-      interval: 3s
-      timeout: 3s
-      retries: 15
-
-  api:
-    build:
-      context: .
-      dockerfile: docker/api.Dockerfile
-    environment:
-      PORT: "3001"
-      DATABASE_URL: postgresql://cafeclick:${POSTGRES_PASSWORD:-local-demo}@db:5432/cafeclick
-      WEB_ORIGIN: http://localhost:3000
-      AUTH_SECRET: ${AUTH_SECRET:?Configura AUTH_SECRET en .env}
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "3001:3001"
-
-  web:
-    build:
-      context: .
-      dockerfile: docker/web.Dockerfile
-    environment:
-      NUXT_PUBLIC_API_BASE: http://localhost:3001
-    ports:
-      - "3000:3000"
-
-volumes:
-  postgres-data:
-```
-
-El `DATABASE_URL` de `.env.example` apunta al puerto publicado para migrar desde la terminal. La API de esta plantilla se ejecuta dentro de Compose y se conecta a `db:5432`. Al agregar el servicio `api`, configura también `AUTH_SECRET` en `.env`.
+Estos comandos usan [la configuración de ejemplo](.env.example) directamente desde un clon limpio. Solo necesitas Docker con Compose.
 
 ```bash
-cp -i .env.example .env
-openssl rand -hex 32
-# Agrega el valor generado a AUTH_SECRET en .env.
-docker compose config --quiet
-docker compose up --build -d
-docker compose logs api
+docker compose --env-file .env.example config --quiet
+docker compose --env-file .env.example up --build --wait
 curl -fsS http://localhost:3001/api/health
-docker compose exec api pnpm --filter @cafeclick/api db:seed
-curl -fsS http://localhost:3001/api/products
+docker compose --env-file .env.example exec api node dist/database/migrate.js
+docker compose --env-file .env.example exec api node dist/database/seed.js
+curl -fsS http://localhost:3000/api/products
 ```
 
-Levantar la app desde `http://localhost:3000`. Volver a ejecutar `docker compose up --build -d` para incluir cambios de código en las imágenes. `docker compose down` conserva el volumen. Reservar `docker compose down -v` para reiniciar deliberadamente la base local.
+Abre `http://localhost:3000` y verifica que el menú muestre los productos. Para ver los logs de arranque usa `docker compose --env-file .env.example logs api`. Repite `up --build --wait` al cambiar código para reconstruir las imágenes.
+
+El volumen `postgres-data` conserva el catálogo después de `down`. Para comprobarlo, vuelve a iniciar los servicios y consulta el catálogo sin volver a cargar los datos de demo.
+
+```bash
+docker compose --env-file .env.example down
+docker compose --env-file .env.example up --wait
+curl -fsS http://localhost:3000/api/products
+docker build -f docker/api.Dockerfile .
+```
+
+Si usas `.env` en local, omite `--env-file .env.example`. Compose pasa `POSTGRES_PASSWORD` a la API por separado de la URL interna. La variable `DATABASE_URL` de la plantilla usa el puerto publicado para los comandos ejecutados desde la terminal del host.
 
 ## 3. Render · Express y PostgreSQL
 
-### `render.yaml`
+1. Después de liberar la configuración a `main`, crea un **Blueprint** en Render conectado al repositorio de GitHub y selecciona esa rama. Un Blueprint lee [render.yaml](render.yaml) para crear y enlazar la API y PostgreSQL. Introduce el origen previsto de Netlify en `WEB_ORIGIN`, como `https://cafeclick.netlify.app`, y ajústalo cuando se confirme la URL.
+2. Render construye el Dockerfile de la API desde la raíz y le pasa la URL interna de PostgreSQL. En los despliegues automáticos, espera a que el CI de `main` pase. El contenedor ejecuta las migraciones y luego Express escucha en `0.0.0.0` con el puerto asignado.
+3. Después del primer despliegue, ejecuta el [seed de catálogo para Render](README.md#datos-de-demo) desde tu máquina con la URL externa de PostgreSQL y TLS. Limita el acceso externo a la IP que ejecutará el seed y retíralo al terminar.
+4. Verifica `/api/health` y `/api/products` desde la URL pública. Espera una respuesta `200` en ambos casos y un catálogo con productos. Guarda los enlaces al despliegue y al workflow del mismo commit.
 
-```yaml
-services:
-  - type: web
-    name: cafeclick-api
-    runtime: docker
-    plan: free
-    branch: main
-    autoDeployTrigger: commit
-    dockerContext: .
-    dockerfilePath: ./docker/api.Dockerfile
-    healthCheckPath: /api/health
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: cafeclick-db
-          property: connectionString
-      - key: WEB_ORIGIN
-        sync: false
-      - key: AUTH_SECRET
-        generateValue: true
-
-databases:
-  - name: cafeclick-db
-    plan: free
-    postgresMajorVersion: "17"
-```
-
-1. Crear un **Blueprint** conectado al repositorio y seleccionar `main`. Usar nombres únicos si los propuestos ya están ocupados. Introducir el dominio de Netlify en `WEB_ORIGIN`. Para arrancar, se puede usar el nombre de sitio previsto y corregir el valor cuando se confirme la URL.
-2. Render construye con el contexto del repositorio y ejecuta el `CMD` del Dockerfile. Express escucha el puerto asignado por Render. La API usa la conexión interna de PostgreSQL creada por el Blueprint, con ambos recursos en la misma región.
-3. El comando de arranque aplica migraciones antes de escuchar. El migrador debe registrar qué versiones se aplicaron, tomar un bloqueo para ejecuciones concurrentes y devolver error si falla. Esto permite usar el mismo proceso con Compose y con el plan gratuito. En un plan que permita pre-deploy, se puede trasladar allí la migración y dejar solo el proceso web en el `CMD`.
-4. Sembrar el catálogo como operación explícita y repetible. En el plan gratuito, si hace falta desde la máquina local, usar la URL externa de PostgreSQL con credenciales temporales de proyecto y TLS según Render, limitar el acceso externo a la IP que hará la operación cuando sea viable y retirar ese acceso después. Usar solo datos de demo.
-5. Verificar `/api/health` y `/api/products` desde la URL pública. El health check devuelve `200` al poder consultar PostgreSQL y `503` si falla. Guardar la URL y el commit del deploy.
-
-Render gratuito puede suspender el servicio web por inactividad y la base gratuita tiene vigencia de 30 días. Comprobar el arranque antes de la presentación y respaldar la base antes de la fecha de expiración. Para un respaldo, ejecutar `pg_dump` con acceso externo temporal y una versión compatible con PostgreSQL 17.
+Render gratuito puede suspender el servicio web por inactividad y la base gratuita expira tras 30 días. Comprueba el arranque antes de la presentación y respalda la base antes de la fecha de expiración.
 
 ## 4. Netlify · Nuxt
 
