@@ -23,8 +23,8 @@ export async function startTestServer(context: TestContext, listener: RequestLis
   return `http://127.0.0.1:${address.port}`
 }
 
-export function fetchWithTimeout(url: string) {
-  return fetch(url, { signal: AbortSignal.timeout(10000) })
+export function fetchWithTimeout(url: string, options?: RequestInit) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(10000) })
 }
 
 export function createCleanupStack(context: TestContext) {

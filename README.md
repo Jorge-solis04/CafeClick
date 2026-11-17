@@ -2,7 +2,7 @@
 
 CaféClick es un proyecto final de Cómputo en la Nube para gestionar pedidos de una cafetería universitaria. El cliente (estudiante) consulta el menú, arma un carrito, confirma el pedido y sigue su preparación. El dueño de la cafetería, desde el panel de cocina, recibe pedidos y actualiza su estado hasta la entrega.
 
-**Estado** · El monorepo tiene la base de Nuxt y Express. El backlog define las funciones pendientes y la guía de despliegue reúne las plantillas de configuración.
+**Estado** · Nuxt muestra el catálogo de PostgreSQL a través de Express. El repositorio incluye el entorno local con Docker Compose y la configuración de GitHub Actions y Render.
 
 ## Alcance del MVP
 
@@ -18,8 +18,8 @@ CaféClick es un proyecto final de Cómputo en la Nube para gestionar pedidos de
 | Web (`apps/web/`) | Nuxt 4, Vue 3, TypeScript, Tailwind CSS y Pinia. Sitio estático en Netlify. |
 | API (`apps/api/`) | Node.js 22 y Express 5 con TypeScript. Expone operaciones REST para el catálogo y los pedidos, además del canal SSE. Render construye la imagen con `docker/api.Dockerfile`. |
 | Datos (`database/`) | PostgreSQL 17 con Drizzle ORM sobre `pg`. Las migraciones generadas se versionan en `database/migrations/` y los datos de demostración irán en `database/seeds/`. |
-| Entorno local | Docker Compose iniciará la web, la API y PostgreSQL. Los dos proyectos comparten un workspace de pnpm y el archivo `pnpm-lock.yaml` en la raíz. |
-| Verificación y despliegue | GitHub Actions ejecutará lint, verificación de tipos, pruebas y compilación. Netlify y Render publicarán desde `main`. |
+| Entorno local | Docker Compose inicia la web, la API y PostgreSQL. Los dos proyectos comparten un workspace de pnpm y el archivo `pnpm-lock.yaml` en la raíz. |
+| Verificación y despliegue | El workflow de GitHub Actions define lint, verificación de tipos, pruebas y compilación. La configuración de Render publica la API desde `main` una vez conectado el repositorio. |
 
 ## Flujo de ramas
 
@@ -34,11 +34,24 @@ CaféClick es un proyecto final de Cómputo en la Nube para gestionar pedidos de
 
 ## Ejecución local
 
+### Con Docker Compose
+
+Desde la raíz del proyecto, inicia la web, la API y PostgreSQL con la configuración de ejemplo:
+
+```bash
+docker compose --env-file .env.example up --build --wait
+docker compose --env-file .env.example exec api node dist/database/seed.js
+```
+
+Abre el menú en `http://localhost:3000`. Puedes consultar el estado de la API en `http://localhost:3001/api/health`. Las migraciones se aplican al arrancar la API y el catálogo se carga con el segundo comando. Los datos se conservan entre arranques en el volumen de PostgreSQL.
+
+### Con Node.js y pnpm
+
 Usa Node.js 22.22.3 o posterior en la serie 22 y pnpm 12.15.0. También se admite Node.js 24.15.0 o posterior en la serie 24. Desde la raíz instala ambos proyectos con `pnpm install --frozen-lockfile`.
 
 - `pnpm dev` inicia Nuxt en `http://localhost:3000` y Express en `http://localhost:3001` desde una sola terminal. Pulsa `Ctrl+C` para detener ambos.
 - `pnpm dev:web` y `pnpm dev:api` permiten iniciar una sola app. Abre la URL de Express para ver su mensaje de arranque.
-- `pnpm typecheck`, `pnpm build` y `pnpm test` verifican los tipos, generan los artefactos y ejecutan las pruebas disponibles.
+- `pnpm lint`, `pnpm typecheck`, `pnpm build` y `pnpm test` revisan el código, verifican los tipos, generan los artefactos y ejecutan las pruebas disponibles.
 
 ### Web y API en local
 
@@ -57,7 +70,7 @@ pnpm --filter @cafeclick/api db:migrate
 
 `POSTGRES_PASSWORD` inicializa la contraseña del usuario `cafeclick` y `POSTGRES_PORT` fija el puerto local. `db:migrate` lee `DATABASE_URL` desde el `.env` raíz. Si cambias el puerto o la contraseña, actualiza también la URL. Para un volumen ya inicializado, cambia la contraseña en PostgreSQL antes de actualizar el archivo. `.env` queda ignorado por Git.
 
-Docker administra el volumen `postgres-data`. `docker compose stop db` detiene PostgreSQL y conserva los datos. Los valores de la plantilla son para desarrollo local. Dentro de Compose, los servicios usarán `db:5432`.
+Docker administra el volumen `postgres-data`. `docker compose stop db` detiene PostgreSQL y conserva los datos. Los valores de la plantilla son para desarrollo local. Dentro de Compose, la API usa `db:5432`.
 
 ### Datos de demo
 
@@ -76,9 +89,9 @@ DEMO_CUSTOMER_PASSWORD='elige-una-contraseña' DEMO_KITCHEN_PASSWORD='elige-otra
 Dentro de Docker Compose, el servicio `api` no recibe las contraseñas de demo, así que se pasan al ejecutar el seed:
 
 ```bash
-docker compose exec api pnpm --filter @cafeclick/api db:seed
+docker compose exec api node dist/database/seed.js
 docker compose exec -e DEMO_CUSTOMER_PASSWORD='elige-una-contraseña' -e DEMO_KITCHEN_PASSWORD='elige-otra-contraseña' \
-  api pnpm --filter @cafeclick/api db:seed:accounts
+  api node dist/database/seed-accounts.js
 ```
 
 En Render, los seeds se ejecutan desde tu máquina con la URL externa de PostgreSQL, que exige TLS. Compila antes, porque los seeds usan `dist/`. La variable definida en el comando tiene prioridad sobre el `.env` local:
@@ -103,7 +116,7 @@ TEST_DATABASE_URL='postgresql://cafeclick:local-demo@127.0.0.1:55432/cafeclick' 
 
 `test/catalog.test.ts` comprueba `/api/health`, `/api/products` y los dos seeds sobre una base temporal.
 
-La [guía de despliegue](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) describe cómo extender Compose con la web y la API en CC-04.
+La [guía de despliegue](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) incluye la verificación desde un clon limpio, la comprobación del volumen y los pasos para publicar la API en Render.
 
 ## Entrega académica
 

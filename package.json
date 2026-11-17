@@ -11,7 +11,14 @@
     "dev:api": "pnpm --filter @cafeclick/api dev",
     "generate:web": "pnpm --filter @cafeclick/web generate",
     "build": "pnpm -r build",
+    "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "eslint": "^10.15.0",
+    "eslint-plugin-vue": "^10.12.1",
+    "typescript-eslint": "^8.72.2",
+    "vue-eslint-parser": "^10.4.2"
   }
 }

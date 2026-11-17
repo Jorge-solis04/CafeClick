@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validar proyecto
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: cafeclick
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: cafeclick_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cafeclick -d cafeclick_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://cafeclick:ci-only@127.0.0.1:5432/cafeclick_test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.22.3'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: docker compose --env-file .env.example config --quiet
+      - run: docker build -f docker/api.Dockerfile .

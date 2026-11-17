@@ -1,0 +1,12 @@
+.git
+.github
+**/node_modules
+**/.pnpm-store
+**/.npm-cache
+**/.nuxt
+**/.output
+**/dist
+**/coverage
+**/.env*
+**/.npmrc
+**/*.log
