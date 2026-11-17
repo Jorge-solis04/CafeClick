@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f4f4ef;
+  --color-surface: #ffffff;
+  --color-ink: #1d2721;
+  --color-muted: #59625c;
+  --color-line: #dcded6;
+  --color-leaf: #2f5a45;
+  --color-leaf-strong: #22432f;
+  --color-leaf-soft: #e2eae3;
+  --color-marigold: #e9a400;
+  --color-marigold-soft: #fbefd0;
+
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-marigold);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-leaf);
+    outline-offset: 2px;
+  }
+
+  dialog::backdrop {
+    background-color: rgb(29 39 33 / 0.45);
+  }
+}
