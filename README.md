@@ -118,6 +118,29 @@ TEST_DATABASE_URL='postgresql://cafeclick:local-demo@127.0.0.1:55432/cafeclick' 
 
 La [guía de despliegue](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) incluye la verificación desde un clon limpio, la comprobación del volumen y los pasos para publicar la API en Render.
 
+## Despliegue
+
+| Servicio | URL pública |
+| --- | --- |
+| Web (Netlify) | [cafeclick.netlify.app](https://cafeclick.netlify.app) |
+| API (Render) | [cafeclick-api.onrender.com](https://cafeclick-api.onrender.com) |
+
+### Sitio en Netlify
+
+Netlify genera el sitio estático desde la raíz del monorepo con [`netlify.toml`](netlify.toml): ejecuta `pnpm generate:web` y publica `apps/web/.output/public`. La rama de producción es `main`. La regla de redirección sirve `index.html` en cualquier ruta, así que recargar una ruta interna abre la app en lugar de un 404 de Netlify.
+
+1. Importa el repositorio en Netlify, deja la raíz como directorio base y elige `main` como rama de producción.
+2. En las variables de entorno del sitio, define `NUXT_PUBLIC_API_BASE` con la URL pública de la API, sin barra final: `https://cafeclick-api.onrender.com`. Nuxt la incorpora al generar el sitio, así que si cambia hay que volver a desplegar.
+3. En Render, define `WEB_ORIGIN` con la URL del sitio de Netlify, sin barra final. La API solo acepta solicitudes del navegador desde ese origen.
+4. Abre el sitio publicado y comprueba que el menú carga los productos de Render. Recarga una ruta interna, por ejemplo `/pedido`, y verifica que responde la app de Nuxt y no la página 404 de Netlify.
+
+Para reproducir el build de Netlify en local, genera el sitio con la URL de la API y sirve la carpeta publicada:
+
+```bash
+NUXT_PUBLIC_API_BASE='https://cafeclick-api.onrender.com' pnpm generate:web
+npx serve apps/web/.output/public
+```
+
 ## Entrega académica
 
 | Semana | Demostración prevista |
