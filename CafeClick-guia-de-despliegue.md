@@ -72,7 +72,7 @@ Configurar `ssr: false` en `apps/web/nuxt.config.ts` y declarar `runtimeConfig.p
 ```toml
 [build]
   command = "pnpm generate:web"
-  publish = "apps/web/.output/public"
+  publish = "apps/web/dist"
 
 [build.environment]
   NODE_VERSION = "22"
