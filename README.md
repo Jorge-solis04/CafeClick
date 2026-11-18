@@ -127,7 +127,7 @@ La [guía de despliegue](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compo
 
 ### Sitio en Netlify
 
-Netlify genera el sitio estático desde la raíz del monorepo con [`netlify.toml`](netlify.toml): ejecuta `pnpm generate:web` y publica `apps/web/.output/public`. La rama de producción es `main`. La regla de redirección sirve `index.html` en cualquier ruta, así que recargar una ruta interna abre la app en lugar de un 404 de Netlify.
+Netlify genera el sitio estático desde la raíz del monorepo con [`netlify.toml`](netlify.toml): ejecuta `pnpm generate:web` y publica `apps/web/dist`. Nuxt detecta la variable `NETLIFY` del entorno de build y usa el preset `netlify-static`, que escribe en `dist` en lugar de `.output/public`. La rama de producción es `main`. La regla de redirección sirve `index.html` en cualquier ruta, así que recargar una ruta interna abre la app en lugar de un 404 de Netlify.
 
 1. Importa el repositorio en Netlify, deja la raíz como directorio base y elige `main` como rama de producción.
 2. En las variables de entorno del sitio, define `NUXT_PUBLIC_API_BASE` con la URL pública de la API, sin barra final: `https://cafeclick-api.onrender.com`. Nuxt la incorpora al generar el sitio, así que si cambia hay que volver a desplegar.
@@ -137,8 +137,8 @@ Netlify genera el sitio estático desde la raíz del monorepo con [`netlify.toml
 Para reproducir el build de Netlify en local, genera el sitio con la URL de la API y sirve la carpeta publicada:
 
 ```bash
-NUXT_PUBLIC_API_BASE='https://cafeclick-api.onrender.com' pnpm generate:web
-npx serve apps/web/.output/public
+NETLIFY=true NUXT_PUBLIC_API_BASE='https://cafeclick-api.onrender.com' pnpm generate:web
+npx serve apps/web/dist
 ```
 
 ## Entrega académica
