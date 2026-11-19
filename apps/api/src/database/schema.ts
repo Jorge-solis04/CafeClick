@@ -3,6 +3,7 @@ import { check, index, integer, numeric, pgEnum, pgTable, primaryKey, text, time
 
 export const userRole = pgEnum('user_role', ['customer', 'kitchen'])
 export const orderStatus = pgEnum('order_status', ['pending', 'preparing', 'ready', 'delivered'])
+export const productCategory = pgEnum('product_category', ['drinks', 'food'])
 
 export const users = pgTable('users', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -15,6 +16,7 @@ export const products = pgTable('products', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: text().notNull().unique(),
   price: numeric({ precision: 12, scale: 2 }).notNull(),
+  category: productCategory().notNull(),
 }, (table) => [
   check('products_price_valid', sql`${table.price} >= 0 AND ${table.price} <> 'NaN'::numeric`),
 ])
