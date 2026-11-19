@@ -2,6 +2,7 @@
 import { useCatalog } from '~/composables/useCatalog'
 
 const { products, status, load } = useCatalog()
+const menuSections = computed(() => groupProductsByCategory(products.value))
 const placeholderNameWidths = ['11rem', '8rem', '13rem', '9.5rem', '12rem', '7rem']
 
 onMounted(load)
@@ -55,9 +56,24 @@ onMounted(load)
           Todavía no hay productos en el menú. Vuelve a revisar más tarde.
         </p>
 
-        <ul v-else class="-my-3">
-          <MenuItemRow v-for="product in products" :key="product.id" :product="product" />
-        </ul>
+        <div v-else class="space-y-10">
+          <section
+            v-for="section in menuSections"
+            :key="section.key"
+            :aria-labelledby="section.title ? `menu-section-${section.key}` : undefined"
+          >
+            <h2
+              v-if="section.title"
+              :id="`menu-section-${section.key}`"
+              class="border-b border-ink/80 pb-2 font-display text-2xl font-semibold tracking-tight font-stretch-semi-condensed"
+            >
+              {{ section.title }}
+            </h2>
+            <ul :class="section.title ? 'mt-2' : '-my-3'">
+              <MenuItemRow v-for="product in section.products" :key="product.id" :product="product" />
+            </ul>
+          </section>
+        </div>
       </div>
     </section>
 

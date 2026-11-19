@@ -38,10 +38,10 @@ test('migrations enforce order constraints and preserve existing data on reruns'
     INSERT INTO users (email, password_hash, role) VALUES ('demo@example.com', 'test-hash', 'customer') RETURNING id
   `)
   const { rows: [product] } = await client.query<{ id: number }>(`
-    INSERT INTO products (name, price) VALUES ('Coffee', 42.50) RETURNING id
+    INSERT INTO products (name, price, category) VALUES ('Coffee', 42.50, 'drinks') RETURNING id
   `)
   await assert.rejects(client.query(`
-    INSERT INTO products (name, price) VALUES ('Coffee', 50.00)
+    INSERT INTO products (name, price, category) VALUES ('Coffee', 50.00, 'drinks')
   `), { code: '23505' })
 
   await assert.rejects(client.query(`

@@ -44,7 +44,7 @@ export function createApp(pool: Pool, webOrigin?: string) {
 
   app.get('/api/products', async (_request, response) => {
     const catalog = await database
-      .select({ id: products.id, name: products.name, price: products.price })
+      .select({ id: products.id, name: products.name, price: products.price, category: products.category })
       .from(products)
       .orderBy(asc(products.id))
 

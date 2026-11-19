@@ -77,21 +77,23 @@ test('health and catalog routes read real PostgreSQL data', async (context) => {
 
   const catalogResponse = await fetchWithTimeout(`${baseUrl}/api/products`)
   assert.equal(catalogResponse.status, 200)
-  const { products } = await catalogResponse.json() as { products: { id: number; name: string; price: string }[] }
+  const { products } = await catalogResponse.json() as { products: { id: number; name: string; price: string; category: string }[] }
 
   assert.equal(products.length, 10)
   assert.equal(new Set(products.map((product) => product.name)).size, products.length)
   assert.deepEqual(products.map((product) => product.id), [...products.map((product) => product.id)].sort((left, right) => left - right))
   for (const product of products) {
-    assert.deepEqual(Object.keys(product).sort(), ['id', 'name', 'price'])
+    assert.deepEqual(Object.keys(product).sort(), ['category', 'id', 'name', 'price'])
     assert.ok(Number.isInteger(product.id) && product.id > 0)
     assert.match(product.price, /^\d+\.\d{2}$/)
   }
   assert.deepEqual(products.slice(0, 2), [
-    { id: products[0]?.id, name: 'Café americano', price: '42.50' },
-    { id: products[1]?.id, name: 'Café de olla', price: '38.00' },
+    { id: products[0]?.id, name: 'Café americano', price: '42.50', category: 'drinks' },
+    { id: products[1]?.id, name: 'Café de olla', price: '38.00', category: 'drinks' },
   ])
   assert.equal(products.at(-1)?.name, 'Sándwich de jamón y queso')
+  assert.equal(products.at(-1)?.category, 'food')
+  assert.equal(products.filter((product) => product.category === 'drinks').length, 6)
 })
 
 test('demo account seed stores hashed passwords and can be rerun', async (context) => {

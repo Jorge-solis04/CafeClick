@@ -16,11 +16,11 @@ Las rutas privadas reciben `Authorization: Bearer <token>`. Los IDs y las cantid
 
 ## Catálogo
 
-Cada producto incluye solo `id`, `name` y `price`. El precio es una cadena decimal con dos dígitos.
+Cada producto incluye `id`, `name`, `price` y `category`. El precio es una cadena decimal con dos dígitos. La categoría es `drinks` (bebidas) o `food` (comida) y la web la usa para agrupar el menú.
 
 ```json
 {
-  "products": [{ "id": 1, "name": "Café americano", "price": "42.50" }]
+  "products": [{ "id": 1, "name": "Café americano", "price": "42.50", "category": "drinks" }]
 }
 ```
 
