@@ -12,6 +12,16 @@ export const users = pgTable('users', {
   role: userRole().notNull(),
 })
 
+export const sessions = pgTable('sessions', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  tokenHash: text('token_hash').notNull().unique(),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('sessions_user_id_idx').on(table.userId),
+])
+
 export const products = pgTable('products', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: text().notNull().unique(),

@@ -8,11 +8,36 @@ La API de desarrollo escucha en `http://localhost:3001`. La ruta `GET /` respond
 | --- | --- | --- |
 | `GET /api/health` | Público | `200` con `{"status":"ok"}` si la API puede consultar PostgreSQL. Si falla la conexión, devuelve `503` con el error `database_unavailable`. |
 | `GET /api/products` | Público | `200` con `{"products":[...]}`, ordenados por `id`. Un catálogo vacío devuelve `{"products":[]}`. |
+| `POST /api/auth/login` | Público | `200` con `{"token":"...","expiresAt":"...","user":{...}}`. |
+| `GET /api/auth/session` | Cliente o cocina | `200` con `{"user":{...}}` de la sesión actual. |
+| `POST /api/auth/logout` | Cliente o cocina | `204` y la sesión deja de ser válida. |
 | `POST /api/orders` | Cliente | `201` con `{"order":{...}}` y estado inicial `pending`. |
 | `GET /api/orders` | Cliente o cocina | `200` con `{"orders":[...]}`, de más reciente a más antiguo. El cliente recibe solo sus pedidos. Cocina recibe los pedidos para el panel. |
 | `PATCH /api/orders/:id/status` | Cocina | `200` con `{"order":{...}}` después de aplicar la transición. |
 
 Las rutas privadas reciben `Authorization: Bearer <token>`. Los IDs y las cantidades son enteros positivos. Los importes se expresan como cadenas decimales con dos dígitos después del punto, por ejemplo `"42.50"`, para preservar la precisión. Las fechas se envían en formato ISO 8601 y UTC.
+
+## Sesión
+
+Para iniciar sesión, envía el correo y la contraseña de una cuenta de demo. La API compara el correo sin espacios al inicio o al final y sin distinguir mayúsculas.
+
+```json
+{ "email": "cliente@cafeclick.test", "password": "<contraseña-de-demo>" }
+```
+
+La respuesta incluye el token, su vencimiento y el usuario. El token vence 8 horas después de iniciar sesión. La web lo guarda y lo envía en `Authorization: Bearer <token>`.
+
+```json
+{
+  "token": "Ws0x1Cq8E3Vd6vY9m2rTqP0kZb4LhGcN7uJfA5sKe1o",
+  "expiresAt": "2026-11-21T14:30:00.000Z",
+  "user": { "id": 1, "email": "cliente@cafeclick.test", "role": "customer" }
+}
+```
+
+El rol es `customer` (cliente) o `kitchen` (cocina). `GET /api/auth/session` devuelve el mismo `user` y sirve para comprobar al abrir la web si el token guardado sigue vigente. `POST /api/auth/logout` revoca el token. Las respuestas de sesión llevan `Cache-Control: no-store`.
+
+Si el correo no existe, la contraseña es incorrecta o supera 72 bytes, la API responde `401` con el código `invalid_credentials` y el mensaje "Credenciales inválidas.", sin indicar cuál dato falló. La API guarda solo el hash SHA-256 del token, así que una copia de la base de datos no permite usar las sesiones.
 
 ## Catálogo
 
@@ -62,9 +87,9 @@ Para avanzar un pedido pendiente, cocina envía `{"status":"preparing"}` a `PATC
 
 | HTTP | Situación |
 | --- | --- |
-| `400` | Cuerpo inválido, carrito vacío, cantidad inválida o producto inexistente. |
-| `401` | Token ausente, inválido o expirado en una ruta privada. |
-| `403` | La sesión es válida, pero el rol carece de acceso a la operación. |
+| `400` | Cuerpo inválido, carrito vacío, cantidad inválida o producto inexistente. El cuerpo mal formado usa el código `invalid_request`. |
+| `401` | En el login, credenciales inválidas (`invalid_credentials`). En una ruta privada, token ausente (`unauthorized`) o inválido, expirado o revocado (`session_expired`). |
+| `403` | La sesión es válida, pero el rol carece de acceso a la operación. El código es `forbidden`. |
 | `404` | El pedido solicitado no existe. |
 | `409` | El cambio de estado no corresponde al siguiente paso o el pedido ya fue entregado. |
 | `500` | Error inesperado, por ejemplo si PostgreSQL deja de responder durante una consulta. El código es `internal_error`. |

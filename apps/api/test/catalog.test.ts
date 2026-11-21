@@ -1,56 +1,15 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { setTimeout } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { Client } from 'pg'
 import { createApp } from '../src/app.js'
 import { verifyPassword } from '../src/auth/password.js'
-import { migrateDatabase } from '../src/database/migrations.js'
 import { createDatabasePool } from '../src/database/pool.js'
 import { seedCatalog, seedDemoAccounts } from '../src/database/seeds.js'
-import { createCleanupStack, fetchWithTimeout, startTestServer } from './helpers.js'
+import { createCleanupStack, createMigratedDatabase, fetchWithTimeout, startTestServer } from './helpers.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
-const migrationsDirectory = fileURLToPath(new URL('../../../database/migrations/', import.meta.url))
 const seedsDirectory = fileURLToPath(new URL('../../../database/seeds/', import.meta.url))
-
-const databaseInUseErrorCode = '55006'
-
-async function dropDatabaseWhenIdle(admin: Client, databaseName: string) {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await admin.query(`DROP DATABASE IF EXISTS ${databaseName}`)
-      return
-    } catch (error) {
-      if ((error as { code?: string }).code !== databaseInUseErrorCode || attempt === 20) {
-        throw error
-      }
-
-      await setTimeout(100)
-    }
-  }
-}
-
-async function createMigratedDatabase(deferCleanup: (cleanup: () => Promise<void>) => void, adminUrl: string) {
-  const databaseName = `cafeclick_test_${randomUUID().replaceAll('-', '')}`
-  const testUrl = new URL(adminUrl)
-  testUrl.pathname = `/${databaseName}`
-
-  const admin = new Client({ connectionString: adminUrl })
-  await admin.connect()
-  await admin.query(`CREATE DATABASE ${databaseName}`)
-  deferCleanup(async () => {
-    try {
-      await dropDatabaseWhenIdle(admin, databaseName)
-    } finally {
-      await admin.end()
-    }
-  })
-
-  await migrateDatabase(testUrl.href, migrationsDirectory)
-  return testUrl.href
-}
 
 test('health and catalog routes read real PostgreSQL data', async (context) => {
   if (!databaseUrl) {
