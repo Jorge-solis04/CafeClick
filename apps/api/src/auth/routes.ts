@@ -1,9 +1,9 @@
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import express, { type Router } from 'express'
-import { sendError } from '../http/errors.js'
-import { authenticate, preparePlaceholderPasswordHash } from './login.js'
-import { getSessionToken, getSessionUser, requireSession } from './middleware.js'
-import { createSession, revokeSession } from './sessions.js'
+import { noStore } from '../http/noStore.js'
+import { createAuthController } from './controller.js'
+import { requireSession } from './middleware.js'
+import { createAuthService, preparePlaceholderPasswordHash } from './service.js'
 
 const loginBodyLimit = '4kb'
 
@@ -11,40 +11,13 @@ export function createAuthRouter(database: NodePgDatabase): Router {
   void preparePlaceholderPasswordHash()
 
   const router = express.Router()
+  const service = createAuthService(database)
+  const controller = createAuthController(service)
 
-  router.use((_request, response, next) => {
-    response.set('Cache-Control', 'no-store')
-    next()
-  })
-
-  router.post('/login', express.json({ limit: loginBodyLimit }), async (request, response) => {
-    const { email, password } = request.body ?? {}
-
-    if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
-      sendError(response, 400, 'invalid_request', 'Escribe tu correo y tu contraseña.')
-      return
-    }
-
-    const user = await authenticate(database, email, password)
-
-    if (!user) {
-      sendError(response, 401, 'invalid_credentials', 'Credenciales inválidas.')
-      return
-    }
-
-    const session = await createSession(database, user.id)
-
-    response.json({ token: session.token, expiresAt: session.expiresAt.toISOString(), user })
-  })
-
-  router.get('/session', requireSession(database), (_request, response) => {
-    response.json({ user: getSessionUser(response) })
-  })
-
-  router.post('/logout', requireSession(database), async (_request, response) => {
-    await revokeSession(database, getSessionToken(response))
-    response.status(204).end()
-  })
+  router.use(noStore)
+  router.post('/login', express.json({ limit: loginBodyLimit }), controller.login)
+  router.get('/session', requireSession(database), controller.getSession)
+  router.post('/logout', requireSession(database), controller.logout)
 
   return router
 }

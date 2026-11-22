@@ -5,7 +5,7 @@ import { Client } from 'pg'
 import { createApp } from '../src/app.js'
 import { createDatabasePool } from '../src/database/pool.js'
 import { seedCatalog, seedDemoAccounts } from '../src/database/seeds.js'
-import type { OrderView } from '../src/orders/orders.js'
+import type { OrderView } from '../src/orders/types.js'
 import { createCleanupStack, createMigratedDatabase, fetchWithTimeout, startTestServer } from './helpers.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
@@ -89,6 +89,7 @@ test('customers place orders priced by PostgreSQL, not by the client', async (co
 
   const { order } = await response.json() as { order: OrderView }
   assert.equal(order.status, 'pending')
+  assert.equal(order.version, 1)
   assert.equal(order.total, '162.50')
   assert.ok(!Number.isNaN(Date.parse(order.createdAt)))
   assert.deepEqual(order.items, [
@@ -201,11 +202,12 @@ test('kitchen sees open orders oldest first and advances them one step at a time
   assert.equal(skipped.status, 409)
   assert.equal((await skipped.json() as ErrorBody).error.code, 'invalid_transition')
 
-  for (const status of ['preparing', 'ready', 'delivered']) {
+  for (const [index, status] of (['preparing', 'ready', 'delivered'] as const).entries()) {
     const response = await advance(baseUrl, kitchenToken, first.id, status)
     assert.equal(response.status, 200)
     const { order } = await response.json() as { order: OrderView }
     assert.equal(order.status, status)
+    assert.equal(order.version, index + 2)
     assert.deepEqual(order.items, first.items)
   }
 

@@ -1,30 +1,21 @@
-import cors from 'cors'
-import { asc } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import express, { type ErrorRequestHandler } from 'express'
+import express from 'express'
 import type { Pool } from 'pg'
 import { createAuthRouter } from './auth/routes.js'
-import { products } from './database/schema.js'
-import { sendError } from './http/errors.js'
+import { createApiCors } from './http/cors.js'
+import { handleUnexpectedError } from './http/errors.js'
 import { requestLogger, type WriteRequestLog } from './http/requestLogger.js'
+import { createOrderEventHub, type OrderEventHub } from './orders/events.js'
 import { createOrdersRouter } from './orders/routes.js'
+import { createProductsRouter } from './products/routes.js'
+import { createSystemRouter } from './system/routes.js'
 
-function isRequestBodyError(error: unknown): error is { status: number } {
-  const { status, type } = (error ?? {}) as { status?: unknown; type?: unknown }
-  return typeof status === 'number' && status >= 400 && status < 500 && typeof type === 'string'
-}
-
-const handleUnexpectedError: ErrorRequestHandler = (error, _request, response, _next) => {
-  if (isRequestBodyError(error)) {
-    sendError(response, error.status, 'invalid_request', 'El cuerpo de la solicitud no es válido.')
-    return
-  }
-
-  console.error(error)
-  sendError(response, 500, 'internal_error', 'Ocurrió un error inesperado.')
-}
-
-export function createApp(pool: Pool, webOrigin?: string, writeRequestLog?: WriteRequestLog) {
+export function createApp(
+  pool: Pool,
+  webOrigin?: string,
+  writeRequestLog?: WriteRequestLog,
+  orderEvents: OrderEventHub = createOrderEventHub(),
+) {
   const database = drizzle(pool)
   const app = express()
 
@@ -35,40 +26,13 @@ export function createApp(pool: Pool, webOrigin?: string, writeRequestLog?: Writ
   }
 
   if (webOrigin) {
-    app.use('/api', cors({
-      origin: [new URL(webOrigin).origin],
-      methods: ['GET', 'HEAD', 'POST', 'PATCH'],
-      allowedHeaders: ['Authorization', 'Content-Type'],
-    }))
+    app.use('/api', createApiCors(webOrigin))
   }
 
-  app.get('/', (_request, response) => {
-    response.json({ message: 'CaféClick API is running' })
-  })
-
-  app.get('/api/health', async (_request, response) => {
-    try {
-      await pool.query('SELECT 1')
-      response.json({ status: 'ok' })
-    } catch (error) {
-      console.error('PostgreSQL health check failed', error)
-      response.status(503).json({
-        error: { code: 'database_unavailable', message: 'La API no puede consultar PostgreSQL.' },
-      })
-    }
-  })
-
-  app.get('/api/products', async (_request, response) => {
-    const catalog = await database
-      .select({ id: products.id, name: products.name, price: products.price, category: products.category })
-      .from(products)
-      .orderBy(asc(products.id))
-
-    response.json({ products: catalog })
-  })
-
+  app.use('/', createSystemRouter(pool))
+  app.use('/api/products', createProductsRouter(database))
   app.use('/api/auth', createAuthRouter(database))
-  app.use('/api/orders', createOrdersRouter(database))
+  app.use('/api/orders', createOrdersRouter(database, orderEvents))
 
   app.use(handleUnexpectedError)
 

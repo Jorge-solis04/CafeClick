@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
 import type { RequestHandler } from 'express'
-import type { SessionUser } from '../auth/sessions.js'
+import type { SessionUser } from '../auth/types.js'
 
 export type RequestLogEntry = {
   method: string
