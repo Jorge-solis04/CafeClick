@@ -5,7 +5,7 @@ import { Client } from 'pg'
 import { createApp } from '../src/app.js'
 import { createDatabasePool } from '../src/database/pool.js'
 import { seedCatalog, seedDemoAccounts } from '../src/database/seeds.js'
-import type { OrderView } from '../src/orders/orders.js'
+import type { OrderView } from '../src/orders/types.js'
 import { createCleanupStack, createMigratedDatabase, fetchWithTimeout, startTestServer } from './helpers.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL

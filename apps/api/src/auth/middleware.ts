@@ -1,7 +1,8 @@
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { Request, RequestHandler, Response } from 'express'
 import { sendError } from '../http/errors.js'
-import { findSessionUser, type SessionUser, type UserRole } from './sessions.js'
+import { createAuthService } from './service.js'
+import type { SessionUser, UserRole } from './types.js'
 
 const bearerTokenPattern = /^Bearer (\S+)$/
 
@@ -30,6 +31,8 @@ export function getSessionToken(response: Response): string {
 }
 
 export function requireSession(database: NodePgDatabase): RequestHandler {
+  const authService = createAuthService(database)
+
   return async (request, response, next) => {
     const token = readBearerToken(request)
 
@@ -38,7 +41,7 @@ export function requireSession(database: NodePgDatabase): RequestHandler {
       return
     }
 
-    const sessionUser = await findSessionUser(database, token)
+    const sessionUser = await authService.findSessionUser(token)
 
     if (!sessionUser) {
       sendError(response, 401, 'session_expired', 'Tu sesión no es válida o expiró. Inicia sesión de nuevo.')

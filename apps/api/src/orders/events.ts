@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { Request, Response } from 'express'
-import type { SessionUser } from '../auth/sessions.js'
-import type { OrderView } from './orders.js'
+import type { SessionUser } from '../auth/types.js'
+import type { OrderView } from './types.js'
 
 export const defaultStreamTicketLifetimeMs = 60 * 1000
 export const defaultStreamHeartbeatIntervalMs = 25 * 1000
