@@ -1,15 +1,37 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Product } from '~/types/catalog'
 import { priceToCents } from '~/utils/money'
+import { parseStoredCart, type StoredCartLine } from '~/utils/storedCart'
 
-export type CartLine = {
-  product: Product
-  quantity: number
+export type CartLine = StoredCartLine
+
+const cartStorageKey = 'cafeclick.cart'
+
+function readStoredCart() {
+  try {
+    return parseStoredCart(localStorage.getItem(cartStorageKey))
+  } catch {
+    return []
+  }
+}
+
+function writeStoredCart(lines: CartLine[]) {
+  try {
+    if (lines.length) {
+      localStorage.setItem(cartStorageKey, JSON.stringify(lines))
+    } else {
+      localStorage.removeItem(cartStorageKey)
+    }
+  } catch {
+    return
+  }
 }
 
 export const useCartStore = defineStore('cart', () => {
-  const lines = ref<CartLine[]>([])
+  const lines = ref<CartLine[]>(readStoredCart())
+
+  watch(lines, writeStoredCart, { deep: true })
 
   const itemCount = computed(() => lines.value.reduce((total, line) => total + line.quantity, 0))
   const subtotalCents = computed(() => lines.value.reduce(

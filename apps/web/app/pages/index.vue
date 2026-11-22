@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useCatalog } from '~/composables/useCatalog'
 
+definePageMeta({ allowedRoles: ['customer'], allowGuests: true })
+
 const { products, status, load } = useCatalog()
 const menuSections = computed(() => groupProductsByCategory(products.value))
 const placeholderNameWidths = ['11rem', '8rem', '13rem', '9.5rem', '12rem', '7rem']
@@ -84,5 +86,6 @@ onMounted(load)
     </aside>
 
     <CartSheet />
+    <OrderConfirmation />
   </div>
 </template>

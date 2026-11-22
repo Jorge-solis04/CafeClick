@@ -6,6 +6,8 @@ import type { Pool } from 'pg'
 import { createAuthRouter } from './auth/routes.js'
 import { products } from './database/schema.js'
 import { sendError } from './http/errors.js'
+import { requestLogger, type WriteRequestLog } from './http/requestLogger.js'
+import { createOrdersRouter } from './orders/routes.js'
 
 function isRequestBodyError(error: unknown): error is { status: number } {
   const { status, type } = (error ?? {}) as { status?: unknown; type?: unknown }
@@ -22,16 +24,20 @@ const handleUnexpectedError: ErrorRequestHandler = (error, _request, response, _
   sendError(response, 500, 'internal_error', 'Ocurrió un error inesperado.')
 }
 
-export function createApp(pool: Pool, webOrigin?: string) {
+export function createApp(pool: Pool, webOrigin?: string, writeRequestLog?: WriteRequestLog) {
   const database = drizzle(pool)
   const app = express()
 
   app.disable('x-powered-by')
 
+  if (writeRequestLog) {
+    app.use(requestLogger(writeRequestLog))
+  }
+
   if (webOrigin) {
     app.use('/api', cors({
       origin: [new URL(webOrigin).origin],
-      methods: ['GET', 'HEAD', 'POST'],
+      methods: ['GET', 'HEAD', 'POST', 'PATCH'],
       allowedHeaders: ['Authorization', 'Content-Type'],
     }))
   }
@@ -62,6 +68,7 @@ export function createApp(pool: Pool, webOrigin?: string) {
   })
 
   app.use('/api/auth', createAuthRouter(database))
+  app.use('/api/orders', createOrdersRouter(database))
 
   app.use(handleUnexpectedError)
 

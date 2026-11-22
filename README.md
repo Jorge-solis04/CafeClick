@@ -70,6 +70,8 @@ pnpm --filter @cafeclick/api db:migrate
 
 `POSTGRES_PASSWORD` inicializa la contraseña del usuario `cafeclick` y `POSTGRES_PORT` fija el puerto local. `db:migrate` lee `DATABASE_URL` desde el `.env` raíz. Si cambias el puerto o la contraseña, actualiza también la URL. Para un volumen ya inicializado, cambia la contraseña en PostgreSQL antes de actualizar el archivo. `.env` queda ignorado por Git.
 
+Para explorar las tablas en el navegador, ejecuta `pnpm --filter @cafeclick/api db:studio` y abre `https://local.drizzle.studio`. Drizzle Studio usa la misma `DATABASE_URL` del `.env` raíz.
+
 Docker administra el volumen `postgres-data`. `docker compose stop db` detiene PostgreSQL y conserva los datos. Los valores de la plantilla son para desarrollo local. Dentro de Compose, la API usa `db:5432`.
 
 ### Datos de demo

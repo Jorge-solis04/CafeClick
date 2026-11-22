@@ -12,7 +12,7 @@ La API de desarrollo escucha en `http://localhost:3001`. La ruta `GET /` respond
 | `GET /api/auth/session` | Cliente o cocina | `200` con `{"user":{...}}` de la sesión actual. |
 | `POST /api/auth/logout` | Cliente o cocina | `204` y la sesión deja de ser válida. |
 | `POST /api/orders` | Cliente | `201` con `{"order":{...}}` y estado inicial `pending`. |
-| `GET /api/orders` | Cliente o cocina | `200` con `{"orders":[...]}`, de más reciente a más antiguo. El cliente recibe solo sus pedidos. Cocina recibe los pedidos para el panel. |
+| `GET /api/orders` | Cliente o cocina | `200` con `{"orders":[...]}`. El cliente recibe solo sus pedidos, de más reciente a más antiguo. Cocina recibe los pedidos que aún no se entregan, de más antiguo a más reciente, para atender primero al que lleva más tiempo esperando. |
 | `PATCH /api/orders/:id/status` | Cocina | `200` con `{"order":{...}}` después de aplicar la transición. |
 
 Las rutas privadas reciben `Authorization: Bearer <token>`. Los IDs y las cantidades son enteros positivos. Los importes se expresan como cadenas decimales con dos dígitos después del punto, por ejemplo `"42.50"`, para preservar la precisión. Las fechas se envían en formato ISO 8601 y UTC.
@@ -61,6 +61,8 @@ Para confirmar un pedido, envía un arreglo de productos y cantidades. La API us
 }
 ```
 
+Cada producto aparece una sola vez por pedido, con una cantidad entera entre 1 y 50, y un pedido admite hasta 50 productos distintos. Cualquier total, precio u otro campo que envíe la interfaz se ignora. La API recalcula el total y guarda el pedido y sus renglones en una sola transacción, así que un pedido rechazado no deja datos a medias.
+
 La creación y la actualización devuelven el pedido completo. El listado usa la misma representación para cada pedido.
 
 ```json
@@ -75,7 +77,7 @@ La creación y la actualización devuelven el pedido completo. El listado usa la
 }
 ```
 
-Para avanzar un pedido pendiente, cocina envía `{"status":"preparing"}` a `PATCH /api/orders/12/status`. La API usa `pending → preparing → ready → delivered`. La interfaz los muestra como pendiente, preparación, listo y entregado. Cada solicitud puede avanzar un solo estado. `delivered` es definitivo.
+Para avanzar un pedido pendiente, cocina envía `{"status":"preparing"}` a `PATCH /api/orders/12/status`. La API usa `pending → preparing → ready → delivered`. La interfaz los muestra como pendiente, preparación, listo y entregado. Cada solicitud puede avanzar un solo estado. `delivered` es definitivo. El avance es atómico: si dos personas de cocina avanzan el mismo pedido al mismo tiempo, solo una solicitud se aplica y la otra recibe `409`. Las respuestas de pedidos llevan `Cache-Control: no-store`.
 
 ## Errores
 
@@ -87,10 +89,10 @@ Para avanzar un pedido pendiente, cocina envía `{"status":"preparing"}` a `PATC
 
 | HTTP | Situación |
 | --- | --- |
-| `400` | Cuerpo inválido, carrito vacío, cantidad inválida o producto inexistente. El cuerpo mal formado usa el código `invalid_request`. |
+| `400` | Carrito vacío, cantidad inválida o producto repetido (`invalid_order`). Producto inexistente (`unknown_product`). Cuerpo mal formado o estado desconocido (`invalid_request`). |
 | `401` | En el login, credenciales inválidas (`invalid_credentials`). En una ruta privada, token ausente (`unauthorized`) o inválido, expirado o revocado (`session_expired`). |
 | `403` | La sesión es válida, pero el rol carece de acceso a la operación. El código es `forbidden`. |
-| `404` | El pedido solicitado no existe. |
-| `409` | El cambio de estado no corresponde al siguiente paso o el pedido ya fue entregado. |
+| `404` | El pedido solicitado no existe (`order_not_found`). |
+| `409` | El cambio de estado no corresponde al siguiente paso o el pedido ya fue entregado (`invalid_transition`). |
 | `500` | Error inesperado, por ejemplo si PostgreSQL deja de responder durante una consulta. El código es `internal_error`. |
 | `503` | La comprobación de PostgreSQL en `/api/health` falló. El código es `database_unavailable`. |
