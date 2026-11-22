@@ -85,7 +85,7 @@ test('OPTIONS /api/products allows the frontend to send API request headers', as
 
   assert.equal(response.status, 204)
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), webOrigin)
-  assert.equal(response.headers.get('Access-Control-Allow-Methods'), 'GET,HEAD,POST')
+  assert.equal(response.headers.get('Access-Control-Allow-Methods'), 'GET,HEAD,POST,PATCH')
   assert.equal(response.headers.get('Access-Control-Allow-Headers'), 'Authorization,Content-Type')
 })
 
