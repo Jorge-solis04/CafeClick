@@ -2,12 +2,13 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import express, { type Router } from 'express'
 import { getSessionUser, requireRole, requireSession } from '../auth/middleware.js'
 import { sendError } from '../http/errors.js'
+import { createOrderEventHub, type OrderEventHub } from './events.js'
 import { advanceOrderStatus, createOrder, listOrders } from './orders.js'
 import { parseOrderId, parseOrderItems, parseOrderStatus } from './validation.js'
 
 const orderBodyLimit = '16kb'
 
-export function createOrdersRouter(database: NodePgDatabase): Router {
+export function createOrdersRouter(database: NodePgDatabase, eventHub: OrderEventHub = createOrderEventHub()): Router {
   const router = express.Router()
 
   router.use((_request, response, next) => {
@@ -15,7 +16,25 @@ export function createOrdersRouter(database: NodePgDatabase): Router {
     next()
   })
 
+  router.get('/stream', (request, response) => {
+    const ticket = typeof request.query.ticket === 'string' ? request.query.ticket : ''
+    const user = eventHub.consumeTicket(ticket)
+
+    if (!user) {
+      sendError(response, 401, 'invalid_stream_ticket', 'El ticket del stream no es válido o expiró. Solicita uno nuevo.')
+      return
+    }
+
+    response.locals.sessionUser = user
+    eventHub.subscribe(request, response, user)
+  })
+
   router.use(requireSession(database))
+
+  router.post('/stream-ticket', (_request, response) => {
+    const { ticket, expiresAt } = eventHub.issueTicket(getSessionUser(response))
+    response.status(201).json({ ticket, expiresAt: expiresAt.toISOString() })
+  })
 
   router.post('/', requireRole('customer'), express.json({ limit: orderBodyLimit }), async (request, response) => {
     const items = parseOrderItems(request.body)
@@ -32,6 +51,7 @@ export function createOrdersRouter(database: NodePgDatabase): Router {
       return
     }
 
+    eventHub.publishOrderCreated(result.order)
     response.status(201).json({ order: result.order })
   })
 
@@ -66,6 +86,7 @@ export function createOrdersRouter(database: NodePgDatabase): Router {
       return
     }
 
+    eventHub.publishOrderStatusUpdated(result.order, result.ownerUserId)
     response.json({ order: result.order })
   })
 

@@ -35,10 +35,12 @@ export const orders = pgTable('orders', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   userId: integer('user_id').notNull().references(() => users.id),
   status: orderStatus().notNull().default('pending'),
+  version: integer().notNull().default(1),
   total: numeric({ precision: 14, scale: 2 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check('orders_total_valid', sql`${table.total} >= 0 AND ${table.total} <> 'NaN'::numeric`),
+  check('orders_version_positive', sql`${table.version} > 0`),
   index('orders_user_id_created_at_idx').on(table.userId, table.createdAt.desc()),
 ])
 

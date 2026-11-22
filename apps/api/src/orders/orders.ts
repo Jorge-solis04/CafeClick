@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { orderItems, orders, products } from '../database/schema.js'
 import type { SessionUser } from '../auth/sessions.js'
@@ -15,6 +15,7 @@ export type OrderItemView = {
 export type OrderView = {
   id: number
   status: OrderStatus
+  version: number
   createdAt: string
   total: string
   items: OrderItemView[]
@@ -23,6 +24,7 @@ export type OrderView = {
 type OrderRow = {
   id: number
   status: OrderStatus
+  version: number
   createdAt: Date
   total: string
 }
@@ -32,7 +34,7 @@ export type CreateOrderResult =
   | { outcome: 'unknown_product' }
 
 export type AdvanceOrderResult =
-  | { outcome: 'advanced', order: OrderView }
+  | { outcome: 'advanced', order: OrderView, ownerUserId: number }
   | { outcome: 'not_found' }
   | { outcome: 'invalid_transition' }
 
@@ -43,7 +45,13 @@ const requiredPreviousStatus: Record<OrderStatus, OrderStatus | null> = {
   delivered: 'ready',
 }
 
-const orderColumns = { id: orders.id, status: orders.status, createdAt: orders.createdAt, total: orders.total }
+const orderColumns = {
+  id: orders.id,
+  status: orders.status,
+  version: orders.version,
+  createdAt: orders.createdAt,
+  total: orders.total,
+}
 
 function toOrderView(order: OrderRow, items: OrderItemView[]): OrderView {
   return { ...order, createdAt: order.createdAt.toISOString(), items }
@@ -133,13 +141,14 @@ export async function advanceOrderStatus(database: NodePgDatabase, orderId: numb
   if (previousStatus) {
     const [advanced] = await database
       .update(orders)
-      .set({ status: nextStatus })
+      .set({ status: nextStatus, version: sql`${orders.version} + 1` })
       .where(and(eq(orders.id, orderId), eq(orders.status, previousStatus)))
-      .returning(orderColumns)
+      .returning({ ...orderColumns, userId: orders.userId })
 
     if (advanced) {
-      const [order] = await attachItems(database, [advanced])
-      return { outcome: 'advanced', order: order! }
+      const { userId, ...orderRow } = advanced
+      const [order] = await attachItems(database, [orderRow])
+      return { outcome: 'advanced', order: order!, ownerUserId: userId }
     }
   }
 
