@@ -4,6 +4,8 @@ import { useSessionStore } from '~/stores/session'
 const session = useSessionStore()
 const route = useRoute()
 
+useOrderStream()
+
 async function logout() {
   await session.logout()
   await navigateTo('/login')
