@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Order } from '~/types/order'
 import { useCartStore } from './cart'
+import { useOrdersStore } from './orders'
 
 export const useCheckoutStore = defineStore('checkout', () => {
   const isSubmitting = ref(false)
@@ -24,6 +25,7 @@ export const useCheckoutStore = defineStore('checkout', () => {
         body: { items: toOrderItems(cart.lines) },
       })
       confirmedOrder.value = response.order
+      useOrdersStore().applyEvent(response.order, 'customer')
       cart.clear()
     } catch (error) {
       const apiError = readApiError(error)

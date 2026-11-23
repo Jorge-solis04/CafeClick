@@ -13,6 +13,8 @@ onMounted(load)
 <template>
   <div class="mx-auto grid max-w-6xl gap-x-16 px-5 pt-10 pb-32 sm:px-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:pt-14 lg:pb-20">
     <section aria-labelledby="menu-heading">
+      <CustomerActiveOrderBar />
+
       <h1 id="menu-heading" class="font-display text-4xl font-semibold tracking-tight font-stretch-semi-condensed sm:text-5xl">
         Menú
       </h1>
