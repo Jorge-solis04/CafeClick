@@ -20,5 +20,8 @@
     "eslint-plugin-vue": "^10.12.1",
     "typescript-eslint": "^8.72.2",
     "vue-eslint-parser": "^10.4.2"
+  },
+  "dependencies": {
+    "pnpm": "^12.23.0"
   }
 }

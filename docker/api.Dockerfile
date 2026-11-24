@@ -17,7 +17,8 @@ ENV DATABASE_DIR=/app/database
 RUN pnpm --filter @cafeclick/api install --prod --frozen-lockfile
 COPY --from=build /app/apps/api/dist/ apps/api/dist/
 COPY database/ database/
+COPY docker/api-start.sh /usr/local/bin/api-start.sh
 WORKDIR /app/apps/api
 USER node
 EXPOSE 3001
-CMD ["sh", "-c", "node dist/database/migrate.js && exec node dist/server.js"]
+CMD ["sh", "/usr/local/bin/api-start.sh"]
