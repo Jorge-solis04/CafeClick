@@ -18,6 +18,11 @@ watch(() => checkout.confirmedOrder, async (order) => {
 function close() {
   dialog.value?.close()
 }
+
+async function track() {
+  close()
+  await navigateTo('/pedido')
+}
 </script>
 
 <template>
@@ -65,13 +70,22 @@ function close() {
         Muestra tu folio al recoger tu pedido.
       </p>
 
-      <button
-        type="button"
-        class="mt-5 h-11 w-full rounded-md bg-leaf font-semibold text-white hover:bg-leaf-strong"
-        @click="close"
-      >
-        Listo
-      </button>
+      <div class="mt-5 grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          class="h-11 rounded-md bg-leaf font-semibold text-white hover:bg-leaf-strong"
+          @click="track"
+        >
+          Seguir mi pedido
+        </button>
+        <button
+          type="button"
+          class="h-11 rounded-md bg-leaf-soft font-semibold text-leaf-strong hover:bg-leaf hover:text-white"
+          @click="close"
+        >
+          Seguir en el menú
+        </button>
+      </div>
     </div>
   </dialog>
 </template>

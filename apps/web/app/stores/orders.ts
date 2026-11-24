@@ -4,12 +4,17 @@ import type { Order, OrderStatus, OrderStreamState } from '~/types/order'
 import type { UserRole } from '~/types/session'
 import { useCheckoutStore } from './checkout'
 
+export type OrderListStatus = 'idle' | 'loading' | 'ready' | 'error'
+
 export const useOrdersStore = defineStore('orders', () => {
   const orders = ref<Order[]>([])
-  const isLoading = ref(false)
+  const listStatus = ref<OrderListStatus>('idle')
   const errorMessage = ref<string | null>(null)
   const advancingIds = ref<number[]>([])
+  const advanceErrors = ref<Record<number, string>>({})
   const connectionState = ref<OrderStreamState>('idle')
+
+  const isLoading = computed(() => listStatus.value === 'loading')
 
   const activeCustomerOrder = computed(
     () => orders.value.find((order) => order.status !== 'delivered') ?? orders.value[0] ?? null,
@@ -19,12 +24,29 @@ export const useOrdersStore = defineStore('orders', () => {
     return advancingIds.value.includes(orderId)
   }
 
+  function advanceErrorFor(orderId: number) {
+    return advanceErrors.value[orderId] ?? null
+  }
+
+  function clearAdvanceError(orderId: number) {
+    if (orderId in advanceErrors.value) {
+      const rest = { ...advanceErrors.value }
+      delete rest[orderId]
+      advanceErrors.value = rest
+    }
+  }
+
   function setConnectionState(nextState: OrderStreamState) {
     connectionState.value = nextState
   }
 
   function applyEvent(incoming: Order, role: UserRole) {
+    const previous = orders.value
     orders.value = applyOrderUpdate(orders.value, incoming, role)
+
+    if (orders.value !== previous) {
+      clearAdvanceError(incoming.id)
+    }
 
     const checkout = useCheckoutStore()
     if (checkout.confirmedOrder?.id === incoming.id && incoming.version > checkout.confirmedOrder.version) {
@@ -33,8 +55,10 @@ export const useOrdersStore = defineStore('orders', () => {
   }
 
   async function fetchOrders(role: UserRole, options: { silent?: boolean } = {}) {
-    if (!options.silent) {
-      isLoading.value = true
+    const hasLoaded = listStatus.value === 'ready'
+
+    if (!options.silent || !hasLoaded) {
+      listStatus.value = 'loading'
     }
 
     errorMessage.value = null
@@ -42,15 +66,18 @@ export const useOrdersStore = defineStore('orders', () => {
     try {
       const response = await apiFetch<{ orders: Order[] }>('/api/orders')
       orders.value = reconcileOrders(orders.value, response.orders, role)
+      listStatus.value = 'ready'
     } catch (error) {
       const apiError = readApiError(error)
-      if (!isExpiredSessionError(apiError)) {
-        errorMessage.value = apiError.message ?? 'No se pudieron cargar los pedidos.'
+
+      if (isExpiredSessionError(apiError)) {
+        listStatus.value = hasLoaded ? 'ready' : 'idle'
+        return
       }
-    } finally {
-      if (!options.silent) {
-        isLoading.value = false
-      }
+
+      errorMessage.value = apiError.message ?? 'No se pudieron cargar los pedidos.'
+      // Keep showing a list that already loaded; only an empty first load becomes an error screen.
+      listStatus.value = hasLoaded ? 'ready' : 'error'
     }
   }
 
@@ -60,7 +87,7 @@ export const useOrdersStore = defineStore('orders', () => {
     }
 
     advancingIds.value = [...advancingIds.value, orderId]
-    errorMessage.value = null
+    clearAdvanceError(orderId)
 
     try {
       const response = await apiFetch<{ order: Order }>(`/api/orders/${orderId}/status`, {
@@ -70,9 +97,16 @@ export const useOrdersStore = defineStore('orders', () => {
       applyEvent(response.order, 'kitchen')
     } catch (error) {
       const apiError = readApiError(error)
-      if (!isExpiredSessionError(apiError)) {
-        errorMessage.value = apiError.message ?? 'No se pudo actualizar el estado del pedido.'
+
+      if (isExpiredSessionError(apiError)) {
+        return
       }
+
+      if (shouldRefreshAfterAdvanceError(apiError)) {
+        await fetchOrders('kitchen', { silent: true })
+      }
+
+      advanceErrors.value = { ...advanceErrors.value, [orderId]: advanceStatusErrorMessage(apiError) }
     } finally {
       advancingIds.value = advancingIds.value.filter((id) => id !== orderId)
     }
@@ -80,19 +114,22 @@ export const useOrdersStore = defineStore('orders', () => {
 
   function reset() {
     orders.value = []
-    isLoading.value = false
+    listStatus.value = 'idle'
     errorMessage.value = null
     advancingIds.value = []
+    advanceErrors.value = {}
     connectionState.value = 'idle'
   }
 
   return {
     orders,
+    listStatus,
     isLoading,
     errorMessage,
     connectionState,
     activeCustomerOrder,
     isAdvancing,
+    advanceErrorFor,
     setConnectionState,
     applyEvent,
     fetchOrders,

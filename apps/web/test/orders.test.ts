@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Order } from '../app/types/order.ts'
-import { nextOrderActionLabel, nextOrderStatus } from '../app/utils/orderStatus.ts'
+import { advanceStatusErrorMessage, shouldRefreshAfterAdvanceError } from '../app/utils/apiError.ts'
+import { customerStatusHint, nextOrderActionLabel, nextOrderStatus, orderProgressSteps } from '../app/utils/orderStatus.ts'
 import { applyOrderUpdate, buildOrderStreamUrl, reconnectDelayMs, reconcileOrders } from '../app/utils/orderUpdates.ts'
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
@@ -68,4 +69,41 @@ test('reconnectDelayMs backs off smoothly and buildOrderStreamUrl encodes ticket
   assert.equal(nextOrderStatus('pending'), 'preparing')
   assert.equal(nextOrderStatus('delivered'), null)
   assert.equal(nextOrderActionLabel('ready'), 'Marcar como entregado')
+})
+
+test('orderProgressSteps marks finished, current and upcoming steps in order', () => {
+  assert.deepEqual(
+    orderProgressSteps('pending').map((step) => step.state),
+    ['current', 'upcoming', 'upcoming', 'upcoming'],
+  )
+  assert.deepEqual(
+    orderProgressSteps('ready').map((step) => [step.status, step.state]),
+    [['pending', 'done'], ['preparing', 'done'], ['ready', 'current'], ['delivered', 'upcoming']],
+  )
+  assert.deepEqual(
+    orderProgressSteps('delivered').map((step) => step.state),
+    ['done', 'done', 'done', 'current'],
+  )
+  assert.equal(orderProgressSteps('preparing')[1]?.label, 'En preparación')
+})
+
+test('every status has a customer hint', () => {
+  for (const status of ['pending', 'preparing', 'ready', 'delivered'] as const) {
+    assert.ok(customerStatusHint(status).length > 0)
+  }
+})
+
+test('advance errors explain conflicts and only refresh when the order changed elsewhere', () => {
+  const conflict = { status: 409, code: 'invalid_transition', message: null }
+  const missing = { status: 404, code: 'order_not_found', message: null }
+  const offline = { status: null, code: null, message: null }
+
+  assert.match(advanceStatusErrorMessage(conflict), /otra pantalla/)
+  assert.match(advanceStatusErrorMessage(missing), /ya no existe/)
+  assert.match(advanceStatusErrorMessage(offline), /conexión/)
+  assert.match(advanceStatusErrorMessage({ status: 403, code: 'forbidden', message: null }), /cocina/)
+
+  assert.equal(shouldRefreshAfterAdvanceError(conflict), true)
+  assert.equal(shouldRefreshAfterAdvanceError(missing), true)
+  assert.equal(shouldRefreshAfterAdvanceError(offline), false)
 })

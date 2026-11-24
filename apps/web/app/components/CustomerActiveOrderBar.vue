@@ -38,10 +38,15 @@ const activeOrder = computed(() => (
       </div>
     </div>
 
-    <ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-sm text-muted">
-      <li v-for="item in activeOrder.items" :key="item.productId">
-        {{ item.quantity }} × {{ item.name }}
-      </li>
-    </ul>
+    <div class="mt-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t border-line pt-3 text-sm">
+      <ul class="flex flex-wrap gap-x-4 gap-y-1 text-muted">
+        <li v-for="item in activeOrder.items" :key="item.productId">
+          {{ item.quantity }} × {{ item.name }}
+        </li>
+      </ul>
+      <NuxtLink to="/pedido" class="shrink-0 font-semibold text-leaf-strong hover:underline">
+        Ver seguimiento
+      </NuxtLink>
+    </div>
   </section>
 </template>
