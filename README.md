@@ -96,7 +96,9 @@ docker compose exec -e DEMO_CUSTOMER_PASSWORD='elige-una-contraseña' -e DEMO_KI
   api node dist/database/seed-accounts.js
 ```
 
-En Render, los seeds se ejecutan desde tu máquina con la URL externa de PostgreSQL, que exige TLS. Compila antes, porque los seeds usan `dist/`. La variable definida en el comando tiene prioridad sobre el `.env` local:
+En Render, el contenedor corre los seeds al arrancar, después de las migraciones, porque `render.yaml` define `SEED_ON_START=true`. El catálogo se carga siempre. Las cuentas de demo solo se crean si `DEMO_CUSTOMER_PASSWORD` y `DEMO_KITCHEN_PASSWORD` están definidas en el panel de Render; si faltan, el arranque las omite y lo indica en el log. Como ambos seeds se pueden repetir, cada arranque deja las contraseñas con el valor actual de esas variables: para reiniciar las cuentas, cambia las variables o vuelve a desplegar.
+
+Si prefieres ejecutarlos desde tu máquina, usa la URL externa de PostgreSQL, que exige TLS. Compila antes, porque los seeds usan `dist/`. La variable definida en el comando tiene prioridad sobre el `.env` local:
 
 ```bash
 pnpm --filter @cafeclick/api build
