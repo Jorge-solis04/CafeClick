@@ -117,6 +117,16 @@ curl -X POST http://localhost:3001/api/auth/login \
   -d '{"email":"cliente@cafeclick.test","password":"<contraseña-de-demo>"}'
 ```
 
+### Vistas de cliente y cocina
+
+- `/` muestra el menú y el carrito. Con sesión de cliente, arriba aparece el pedido en curso con un enlace al seguimiento.
+- `/pedido` muestra al cliente el estado de su pedido actual, el avance por etapas y el total confirmado. Distingue la carga, el error con opción de reintentar y la cuenta sin pedidos.
+- `/cocina` muestra al personal de cocina los pedidos por entregar, del más antiguo al más reciente, con un botón para avanzar cada uno al siguiente estado. El botón se bloquea mientras se guarda el cambio. Si otra pantalla ya avanzó el pedido, la lista se actualiza y la tarjeta explica qué pasó.
+
+Cada vista revisa el rol. Una cuenta de cliente que abre `/cocina` vuelve al menú, y una de cocina que abre `/pedido` vuelve al panel. La API también rechaza con `403` los cambios de estado hechos con una sesión de cliente y solo devuelve a cada cliente sus propios pedidos.
+
+Para verificarlo con dos sesiones, abre la web en una ventana normal con la cuenta de cliente y en una ventana privada con la de cocina. Confirma un pedido como cliente, avánzalo hasta `entregado` desde cocina y comprueba que `/pedido` cambia de etapa sin recargar.
+
 Con PostgreSQL disponible, `pnpm dev:api` lee `DATABASE_URL` del `.env` raíz. `GET /api/health` responde `200` si la API puede consultar PostgreSQL y `GET /api/products` devuelve el catálogo. El [contrato de la API](docs/api.md) describe las respuestas.
 
 Para cambiar el esquema, edita `apps/api/src/database/schema.ts` y ejecuta `pnpm --filter @cafeclick/api db:generate --name describe_change`. Revisa y versiona el SQL y los metadatos que genere Drizzle en `database/migrations/`. `db:migrate` aplica únicamente archivos pendientes. Si `DATABASE_DIR` está definida, usa `migrations/` dentro de esa ruta.

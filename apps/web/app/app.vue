@@ -23,6 +23,13 @@ async function logout() {
           CaféClick
         </NuxtLink>
         <div v-if="session.user" class="flex min-w-0 items-baseline gap-4 text-sm">
+          <NuxtLink
+            v-if="session.user.role === 'customer' && route.path !== '/pedido'"
+            to="/pedido"
+            class="shrink-0 font-semibold text-leaf-strong hover:underline"
+          >
+            Tu pedido
+          </NuxtLink>
           <span class="hidden truncate text-muted sm:inline">{{ session.user.email }}</span>
           <button type="button" class="shrink-0 font-semibold text-leaf-strong hover:underline" @click="logout">
             Cerrar sesión

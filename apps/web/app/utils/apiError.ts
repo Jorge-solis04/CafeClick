@@ -30,3 +30,23 @@ export function checkoutErrorMessage(error: ApiError) {
 
   return 'No se pudo confirmar tu pedido. Revisa tu conexión e inténtalo de nuevo; tu carrito sigue guardado.'
 }
+
+export function advanceStatusErrorMessage(error: ApiError) {
+  if (error.status === 409) {
+    return 'Este pedido ya cambió de estado en otra pantalla. La lista se actualizó.'
+  }
+
+  if (error.status === 404) {
+    return 'Este pedido ya no existe. La lista se actualizó.'
+  }
+
+  if (error.status === 403) {
+    return 'Solo el personal de cocina puede cambiar el estado de los pedidos.'
+  }
+
+  return 'No se pudo actualizar el pedido. Revisa tu conexión e inténtalo de nuevo.'
+}
+
+export function shouldRefreshAfterAdvanceError(error: ApiError) {
+  return error.status === 409 || error.status === 404
+}
