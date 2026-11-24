@@ -15,21 +15,15 @@ async function logout() {
 <template>
   <div class="min-h-dvh">
     <header class="border-b border-line">
-      <div class="mx-auto flex max-w-6xl items-baseline justify-between gap-4 px-5 py-4 sm:px-8">
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
         <NuxtLink
           :to="session.user ? homePathFor(session.user.role) : '/'"
           class="font-display text-2xl font-bold tracking-tight font-stretch-semi-condensed"
         >
           CaféClick
         </NuxtLink>
-        <div v-if="session.user" class="flex min-w-0 items-baseline gap-4 text-sm">
-          <NuxtLink
-            v-if="session.user.role === 'customer' && route.path !== '/pedido'"
-            to="/pedido"
-            class="shrink-0 font-semibold text-leaf-strong hover:underline"
-          >
-            Tu pedido
-          </NuxtLink>
+        <div v-if="session.user" class="flex min-w-0 items-center gap-4 text-sm">
+          <OrderTrackingLink v-if="session.user.role === 'customer'" />
           <span class="hidden truncate text-muted sm:inline">{{ session.user.email }}</span>
           <button type="button" class="shrink-0 font-semibold text-leaf-strong hover:underline" @click="logout">
             Cerrar sesión

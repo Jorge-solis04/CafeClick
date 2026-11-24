@@ -17,7 +17,7 @@ const isFinished = computed(() => order.value?.status === 'delivered')
   <div class="mx-auto max-w-2xl px-5 pt-10 pb-20 sm:px-8 lg:pt-14">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <h1 class="font-display text-4xl font-semibold tracking-tight font-stretch-semi-condensed sm:text-5xl">
-        Tu pedido
+        Seguimiento
       </h1>
       <StreamStatusBadge v-if="order" :state="ordersStore.connectionState" />
     </div>
@@ -61,40 +61,44 @@ const isFinished = computed(() => order.value?.status === 'delivered')
     <section
       v-else
       aria-labelledby="order-heading"
-      class="mt-8 rounded-lg border bg-surface p-6"
+      class="mt-8 overflow-hidden rounded-xl border bg-surface"
       :class="order.status === 'ready' ? 'border-leaf' : 'border-line'"
     >
-      <p class="text-sm text-muted">
-        {{ isFinished ? 'Tu último pedido' : 'Pedido en curso' }}
-      </p>
-      <div class="mt-1 flex flex-wrap items-center gap-3">
-        <h2 id="order-heading" class="font-display text-3xl font-semibold tracking-tight tabular-nums">
-          Folio #{{ order.id }}
+      <div
+        class="px-6 pt-6 pb-6"
+        :class="order.status === 'ready' ? 'bg-leaf text-white' : isFinished ? 'bg-ink/5' : 'bg-ink text-paper'"
+        aria-live="polite"
+      >
+        <p class="text-sm opacity-80">
+          {{ isFinished ? 'Tu último pedido' : 'Pedido en curso' }} · Folio #{{ order.id }}
+        </p>
+        <h2 id="order-heading" class="mt-1 font-display text-4xl leading-tight font-semibold tracking-tight font-stretch-semi-condensed sm:text-5xl">
+          {{ customerStatusTitle(order.status) }}
         </h2>
-        <OrderStatusBadge :status="order.status" />
+        <p class="mt-2 opacity-90">
+          {{ customerStatusHint(order.status) }}
+        </p>
       </div>
 
-      <p class="mt-4 font-medium" aria-live="polite">
-        {{ customerStatusHint(order.status) }}
-      </p>
+      <div class="px-6 pt-6 pb-6">
+        <OrderProgress :status="order.status" />
 
-      <OrderProgress :status="order.status" class="mt-5" />
+        <ul class="mt-6 space-y-1 border-t border-line pt-4 text-sm">
+          <li v-for="item in order.items" :key="item.productId" class="flex justify-between gap-4">
+            <span>{{ item.quantity }} × {{ item.name }}</span>
+            <span class="tabular-nums text-muted">{{ formatCents(priceToCents(item.unitPrice) * item.quantity) }}</span>
+          </li>
+        </ul>
 
-      <ul class="mt-6 space-y-1 border-t border-line pt-4 text-sm">
-        <li v-for="item in order.items" :key="item.productId" class="flex justify-between gap-4">
-          <span>{{ item.quantity }} × {{ item.name }}</span>
-          <span class="tabular-nums text-muted">{{ formatCents(priceToCents(item.unitPrice) * item.quantity) }}</span>
-        </li>
-      </ul>
+        <div class="mt-4 flex items-baseline justify-between border-t border-line pt-4">
+          <span class="text-sm text-muted">Total confirmado</span>
+          <span class="font-display text-2xl font-semibold tabular-nums">{{ formatPrice(order.total) }}</span>
+        </div>
 
-      <div class="mt-4 flex items-baseline justify-between border-t border-line pt-4">
-        <span class="text-sm text-muted">Total confirmado</span>
-        <span class="font-display text-2xl font-semibold tabular-nums">{{ formatPrice(order.total) }}</span>
+        <p v-if="ordersStore.errorMessage" role="alert" class="mt-4 border-l-2 border-marigold pl-3 text-sm">
+          {{ ordersStore.errorMessage }} El estado puede no estar al día.
+        </p>
       </div>
-
-      <p v-if="ordersStore.errorMessage" role="alert" class="mt-4 border-l-2 border-marigold pl-3 text-sm">
-        {{ ordersStore.errorMessage }} El estado puede no estar al día.
-      </p>
     </section>
 
     <NuxtLink v-if="order" to="/" class="mt-6 inline-block text-sm font-semibold text-leaf-strong hover:underline">

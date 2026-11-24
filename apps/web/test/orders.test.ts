@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Order } from '../app/types/order.ts'
 import { advanceStatusErrorMessage, shouldRefreshAfterAdvanceError } from '../app/utils/apiError.ts'
-import { customerStatusHint, nextOrderActionLabel, nextOrderStatus, orderProgressSteps } from '../app/utils/orderStatus.ts'
+import { customerStatusHint, customerStatusTitle, nextOrderActionLabel, nextOrderStatus, orderProgressSteps } from '../app/utils/orderStatus.ts'
 import { applyOrderUpdate, buildOrderStreamUrl, reconnectDelayMs, reconcileOrders } from '../app/utils/orderUpdates.ts'
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
@@ -87,8 +87,9 @@ test('orderProgressSteps marks finished, current and upcoming steps in order', (
   assert.equal(orderProgressSteps('preparing')[1]?.label, 'En preparación')
 })
 
-test('every status has a customer hint', () => {
+test('every status has a customer title and hint', () => {
   for (const status of ['pending', 'preparing', 'ready', 'delivered'] as const) {
+    assert.ok(customerStatusTitle(status).length > 0)
     assert.ok(customerStatusHint(status).length > 0)
   }
 })

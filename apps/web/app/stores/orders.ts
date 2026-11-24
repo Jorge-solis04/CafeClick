@@ -6,6 +6,13 @@ import { useCheckoutStore } from './checkout'
 
 export type OrderListStatus = 'idle' | 'loading' | 'ready' | 'error'
 
+export type OrderArrival = {
+  orderIds: number[]
+  at: number
+}
+
+const highlightDurationMs = 60000
+
 export const useOrdersStore = defineStore('orders', () => {
   const orders = ref<Order[]>([])
   const listStatus = ref<OrderListStatus>('idle')
@@ -13,6 +20,9 @@ export const useOrdersStore = defineStore('orders', () => {
   const advancingIds = ref<number[]>([])
   const advanceErrors = ref<Record<number, string>>({})
   const connectionState = ref<OrderStreamState>('idle')
+  const highlightedIds = ref<number[]>([])
+  const lastArrival = ref<OrderArrival | null>(null)
+  const highlightTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
   const isLoading = computed(() => listStatus.value === 'loading')
 
@@ -36,6 +46,36 @@ export const useOrdersStore = defineStore('orders', () => {
     }
   }
 
+  function isHighlighted(orderId: number) {
+    return highlightedIds.value.includes(orderId)
+  }
+
+  function unhighlight(orderId: number) {
+    const timer = highlightTimers.get(orderId)
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      highlightTimers.delete(orderId)
+    }
+
+    if (highlightedIds.value.includes(orderId)) {
+      highlightedIds.value = highlightedIds.value.filter((id) => id !== orderId)
+    }
+  }
+
+  function markArrivals(orderIds: number[]) {
+    if (orderIds.length === 0) {
+      return
+    }
+
+    for (const orderId of orderIds) {
+      unhighlight(orderId)
+      highlightedIds.value = [...highlightedIds.value, orderId]
+      highlightTimers.set(orderId, setTimeout(() => unhighlight(orderId), highlightDurationMs))
+    }
+
+    lastArrival.value = { orderIds, at: Date.now() }
+  }
+
   function setConnectionState(nextState: OrderStreamState) {
     connectionState.value = nextState
   }
@@ -46,6 +86,14 @@ export const useOrdersStore = defineStore('orders', () => {
 
     if (orders.value !== previous) {
       clearAdvanceError(incoming.id)
+
+      if (role === 'kitchen') {
+        if (incoming.status === 'pending') {
+          markArrivals(findNewPendingOrderIds(previous, orders.value))
+        } else {
+          unhighlight(incoming.id)
+        }
+      }
     }
 
     const checkout = useCheckoutStore()
@@ -65,8 +113,14 @@ export const useOrdersStore = defineStore('orders', () => {
 
     try {
       const response = await apiFetch<{ orders: Order[] }>('/api/orders')
-      orders.value = reconcileOrders(orders.value, response.orders, role)
+      const previous = orders.value
+      orders.value = reconcileOrders(previous, response.orders, role)
       listStatus.value = 'ready'
+
+      // Orders that show up while reconnecting also count as new for the kitchen.
+      if (role === 'kitchen' && hasLoaded) {
+        markArrivals(findNewPendingOrderIds(previous, orders.value))
+      }
     } catch (error) {
       const apiError = readApiError(error)
 
@@ -113,6 +167,12 @@ export const useOrdersStore = defineStore('orders', () => {
   }
 
   function reset() {
+    for (const timer of highlightTimers.values()) {
+      clearTimeout(timer)
+    }
+    highlightTimers.clear()
+    highlightedIds.value = []
+    lastArrival.value = null
     orders.value = []
     listStatus.value = 'idle'
     errorMessage.value = null
@@ -128,7 +188,10 @@ export const useOrdersStore = defineStore('orders', () => {
     errorMessage,
     connectionState,
     activeCustomerOrder,
+    highlightedIds,
+    lastArrival,
     isAdvancing,
+    isHighlighted,
     advanceErrorFor,
     setConnectionState,
     applyEvent,

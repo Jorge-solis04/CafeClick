@@ -119,9 +119,9 @@ curl -X POST http://localhost:3001/api/auth/login \
 
 ### Vistas de cliente y cocina
 
-- `/` muestra el menú y el carrito. Con sesión de cliente, arriba aparece el pedido en curso con un enlace al seguimiento.
-- `/pedido` muestra al cliente el estado de su pedido actual, el avance por etapas y el total confirmado. Distingue la carga, el error con opción de reintentar y la cuenta sin pedidos.
-- `/cocina` muestra al personal de cocina los pedidos por entregar, del más antiguo al más reciente, con un botón para avanzar cada uno al siguiente estado. El botón se bloquea mientras se guarda el cambio. Si otra pantalla ya avanzó el pedido, la lista se actualiza y la tarjeta explica qué pasó.
+- `/` muestra el menú y el carrito. Con sesión de cliente, el encabezado muestra el enlace «Seguimiento» con el folio y el estado del pedido en curso, que se actualizan en vivo.
+- `/pedido` es la vista de seguimiento. Muestra al cliente el estado de su pedido actual, el avance por etapas y el total confirmado. Distingue la carga, el error con opción de reintentar y la cuenta sin pedidos.
+- `/cocina` muestra al personal de cocina cada pedido como una comanda, repartidos en tres columnas: por preparar, en preparación y listos para entregar. En cada columna, el que lleva más tiempo esperando va primero. Cada comanda muestra el folio, la hora, los minutos de espera, los productos con su cantidad y un botón para avanzar el pedido. El botón se bloquea mientras se guarda el cambio, y marcar un pedido como entregado pide un segundo clic porque no se puede deshacer. Si otra pantalla ya avanzó el pedido, la lista se actualiza y la comanda explica qué pasó. Cuando llega un pedido nuevo, aparece un aviso y la comanda queda resaltada durante un minuto o hasta que se empieza a preparar.
 
 Cada vista revisa el rol. Una cuenta de cliente que abre `/cocina` vuelve al menú, y una de cocina que abre `/pedido` vuelve al panel. La API también rechaza con `403` los cambios de estado hechos con una sesión de cliente y solo devuelve a cada cliente sus propios pedidos.
 

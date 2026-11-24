@@ -38,3 +38,17 @@
     background-color: rgb(29 39 33 / 0.45);
   }
 }
+
+@layer components {
+  /* Kitchen tickets: a torn, zigzag bottom edge like a printed order slip. */
+  .ticket-edge {
+    --tooth: 14px;
+    mask:
+      linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth) / 2) no-repeat,
+      conic-gradient(from -45deg at bottom, #000 90deg, #0000 0) bottom / var(--tooth) calc(var(--tooth) / 2) repeat-x;
+  }
+
+  .ticket-shadow {
+    filter: drop-shadow(0 1px 1px rgb(29 39 33 / 0.22)) drop-shadow(0 6px 10px rgb(29 39 33 / 0.06));
+  }
+}
