@@ -70,6 +70,8 @@ pnpm --filter @cafeclick/api db:migrate
 
 `POSTGRES_PASSWORD` inicializa la contraseña del usuario `cafeclick` y `POSTGRES_PORT` fija el puerto local. `db:migrate` lee `DATABASE_URL` desde el `.env` raíz. Si cambias el puerto o la contraseña, actualiza también la URL. Para un volumen ya inicializado, cambia la contraseña en PostgreSQL antes de actualizar el archivo. `.env` queda ignorado por Git.
 
+Para explorar las tablas en el navegador, ejecuta `pnpm --filter @cafeclick/api db:studio` y abre `https://local.drizzle.studio`. Drizzle Studio usa la misma `DATABASE_URL` del `.env` raíz.
+
 Docker administra el volumen `postgres-data`. `docker compose stop db` detiene PostgreSQL y conserva los datos. Los valores de la plantilla son para desarrollo local. Dentro de Compose, la API usa `db:5432`.
 
 ### Datos de demo
@@ -103,6 +105,28 @@ DATABASE_URL='<url-externa-de-render>?sslmode=require' DEMO_CUSTOMER_PASSWORD='.
   pnpm --filter @cafeclick/api db:seed:accounts
 ```
 
+### Credenciales de demo e inicio de sesión
+
+Las contraseñas de demo no se guardan en el repositorio ni en los issues. Quien ejecuta `db:seed:accounts` en un ambiente elige las contraseñas y las comparte con el equipo por un canal privado. Para la presentación, conviene sembrar en Render contraseñas distintas de las locales. Si una contraseña se filtra, basta con volver a ejecutar el seed con otra; la anterior deja de funcionar, aunque las sesiones abiertas siguen vigentes hasta que expiran.
+
+Con las cuentas sembradas, inicia sesión con `POST /api/auth/login`. La respuesta incluye un token que vence en 8 horas y que las rutas privadas reciben en `Authorization: Bearer <token>`:
+
+```bash
+curl -X POST http://localhost:3001/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"cliente@cafeclick.test","password":"<contraseña-de-demo>"}'
+```
+
+### Vistas de cliente y cocina
+
+- `/` muestra el menú y el carrito. Con sesión de cliente, arriba aparece el pedido en curso con un enlace al seguimiento.
+- `/pedido` muestra al cliente el estado de su pedido actual, el avance por etapas y el total confirmado. Distingue la carga, el error con opción de reintentar y la cuenta sin pedidos.
+- `/cocina` muestra al personal de cocina los pedidos por entregar, del más antiguo al más reciente, con un botón para avanzar cada uno al siguiente estado. El botón se bloquea mientras se guarda el cambio. Si otra pantalla ya avanzó el pedido, la lista se actualiza y la tarjeta explica qué pasó.
+
+Cada vista revisa el rol. Una cuenta de cliente que abre `/cocina` vuelve al menú, y una de cocina que abre `/pedido` vuelve al panel. La API también rechaza con `403` los cambios de estado hechos con una sesión de cliente y solo devuelve a cada cliente sus propios pedidos.
+
+Para verificarlo con dos sesiones, abre la web en una ventana normal con la cuenta de cliente y en una ventana privada con la de cocina. Confirma un pedido como cliente, avánzalo hasta `entregado` desde cocina y comprueba que `/pedido` cambia de etapa sin recargar.
+
 Con PostgreSQL disponible, `pnpm dev:api` lee `DATABASE_URL` del `.env` raíz. `GET /api/health` responde `200` si la API puede consultar PostgreSQL y `GET /api/products` devuelve el catálogo. El [contrato de la API](docs/api.md) describe las respuestas.
 
 Para cambiar el esquema, edita `apps/api/src/database/schema.ts` y ejecuta `pnpm --filter @cafeclick/api db:generate --name describe_change`. Revisa y versiona el SQL y los metadatos que genere Drizzle en `database/migrations/`. `db:migrate` aplica únicamente archivos pendientes. Si `DATABASE_DIR` está definida, usa `migrations/` dentro de esa ruta.
@@ -111,10 +135,10 @@ Para comprobar las migraciones, usa la instancia local de Docker. La prueba crea
 
 ```bash
 TEST_DATABASE_URL='postgresql://cafeclick:local-demo@127.0.0.1:55432/cafeclick' \
-  pnpm --filter @cafeclick/api exec tsx --test test/migrations.test.ts test/catalog.test.ts
+  pnpm --filter @cafeclick/api exec tsx --test test/migrations.test.ts test/catalog.test.ts test/auth.test.ts
 ```
 
-`test/catalog.test.ts` comprueba `/api/health`, `/api/products` y los dos seeds sobre una base temporal.
+`test/catalog.test.ts` comprueba `/api/health`, `/api/products` y los dos seeds sobre una base temporal. `test/auth.test.ts` comprueba el inicio de sesión, las sesiones expiradas o revocadas y el acceso por rol.
 
 La [guía de despliegue](CafeClick-guia-de-despliegue.md#2-docker-y-docker-compose) incluye la verificación desde un clon limpio, la comprobación del volumen y los pasos para publicar la API en Render.
 

@@ -10,6 +10,7 @@
     "db:migrate": "node --env-file-if-exists=../../.env dist/database/migrate.js",
     "db:seed": "node --env-file-if-exists=../../.env dist/database/seed.js",
     "db:seed:accounts": "node --env-file-if-exists=../../.env dist/database/seed-accounts.js",
+    "db:studio": "node --env-file-if-exists=../../.env node_modules/drizzle-kit/bin.cjs studio",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts"
   },

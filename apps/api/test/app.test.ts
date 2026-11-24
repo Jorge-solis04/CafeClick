@@ -85,6 +85,51 @@ test('OPTIONS /api/products allows the frontend to send API request headers', as
 
   assert.equal(response.status, 204)
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), webOrigin)
-  assert.equal(response.headers.get('Access-Control-Allow-Methods'), 'GET,HEAD')
+  assert.equal(response.headers.get('Access-Control-Allow-Methods'), 'GET,HEAD,POST,PATCH')
   assert.equal(response.headers.get('Access-Control-Allow-Headers'), 'Authorization,Content-Type')
+})
+
+test('POST /api/auth/login rejects invalid JSON before reaching PostgreSQL', async (context) => {
+  const baseUrl = await startTestServer(context, createAppWithoutDatabase(context))
+
+  const response = await fetchWithTimeout(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{"password":"secret',
+  })
+
+  assert.equal(response.status, 400)
+  assert.equal(response.headers.get('Cache-Control'), 'no-store')
+  assert.deepEqual(await response.json(), {
+    error: { code: 'invalid_request', message: 'El cuerpo de la solicitud no es válido.' },
+  })
+})
+
+test('GET /api/auth/session requires a bearer token', async (context) => {
+  const baseUrl = await startTestServer(context, createAppWithoutDatabase(context))
+
+  const response = await fetchWithTimeout(`${baseUrl}/api/auth/session`)
+
+  assert.equal(response.status, 401)
+  assert.deepEqual(await response.json(), {
+    error: { code: 'unauthorized', message: 'Inicia sesión para continuar.' },
+  })
+})
+
+test('OPTIONS /api/auth/login lets the frontend send credentials as JSON', async (context) => {
+  const webOrigin = 'https://cafeclick.example.com'
+  const baseUrl = await startTestServer(context, createAppWithoutDatabase(context, webOrigin))
+
+  const response = await fetchWithTimeout(`${baseUrl}/api/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: webOrigin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type',
+    },
+  })
+
+  assert.equal(response.status, 204)
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), webOrigin)
+  assert.match(response.headers.get('Access-Control-Allow-Methods') ?? '', /POST/)
 })

@@ -1,19 +1,13 @@
 <script setup lang="ts">
 import { useCartStore } from '~/stores/cart'
-
-withDefaults(defineProps<{
-  canConfirm?: boolean
-}>(), {
-  canConfirm: false,
-})
-
-const emit = defineEmits<{
-  confirm: []
-}>()
+import { useCheckoutStore } from '~/stores/checkout'
+import { useSessionStore } from '~/stores/session'
 
 const cart = useCartStore()
+const checkout = useCheckoutStore()
+const session = useSessionStore()
+const route = useRoute()
 const headingId = useId()
-const confirmHintId = useId()
 </script>
 
 <template>
@@ -31,6 +25,7 @@ const confirmHintId = useId()
         v-if="cart.itemCount"
         type="button"
         class="text-sm font-medium text-muted underline-offset-4 hover:text-ink hover:underline"
+        :disabled="checkout.isSubmitting"
         @click="cart.clear()"
       >
         Vaciar
@@ -76,18 +71,34 @@ const confirmHintId = useId()
         Precio estimado. La cafetería confirma el total al recibir tu pedido.
       </p>
 
-      <button
-        type="button"
-        class="mt-5 h-11 w-full rounded-md bg-leaf font-semibold text-white hover:bg-leaf-strong disabled:cursor-not-allowed disabled:bg-line disabled:text-muted"
-        :disabled="!canConfirm"
-        :aria-describedby="canConfirm ? undefined : confirmHintId"
-        @click="emit('confirm')"
+      <p
+        v-if="checkout.errorMessage"
+        role="alert"
+        class="mt-4 border-l-2 border-marigold py-1 pl-3 text-sm"
       >
-        Confirmar pedido
-      </button>
-      <p v-if="!canConfirm" :id="confirmHintId" class="mt-2 text-center text-xs text-muted">
-        Inicia sesión para confirmar tu pedido.
+        {{ checkout.errorMessage }}
       </p>
+
+      <button
+        v-if="session.isAuthenticated"
+        type="button"
+        class="mt-5 h-11 w-full rounded-md bg-leaf font-semibold text-white hover:bg-leaf-strong disabled:cursor-wait disabled:bg-line disabled:text-muted"
+        :disabled="checkout.isSubmitting"
+        @click="checkout.confirm()"
+      >
+        {{ checkout.isSubmitting ? 'Confirmando…' : 'Confirmar pedido' }}
+      </button>
+      <template v-else>
+        <NuxtLink
+          :to="{ path: '/login', query: { redirect: route.fullPath } }"
+          class="mt-5 flex h-11 w-full items-center justify-center rounded-md bg-leaf font-semibold text-white hover:bg-leaf-strong"
+        >
+          Inicia sesión para confirmar
+        </NuxtLink>
+        <p class="mt-2 text-center text-xs text-muted">
+          Tu carrito se conserva mientras inicias sesión.
+        </p>
+      </template>
     </template>
   </section>
 </template>

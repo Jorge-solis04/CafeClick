@@ -12,6 +12,16 @@ export const users = pgTable('users', {
   role: userRole().notNull(),
 })
 
+export const sessions = pgTable('sessions', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  tokenHash: text('token_hash').notNull().unique(),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('sessions_user_id_idx').on(table.userId),
+])
+
 export const products = pgTable('products', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: text().notNull().unique(),
@@ -25,10 +35,12 @@ export const orders = pgTable('orders', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   userId: integer('user_id').notNull().references(() => users.id),
   status: orderStatus().notNull().default('pending'),
+  version: integer().notNull().default(1),
   total: numeric({ precision: 14, scale: 2 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check('orders_total_valid', sql`${table.total} >= 0 AND ${table.total} <> 'NaN'::numeric`),
+  check('orders_version_positive', sql`${table.version} > 0`),
   index('orders_user_id_created_at_idx').on(table.userId, table.createdAt.desc()),
 ])
 

@@ -9,7 +9,7 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is required to start the API')
 }
 
-const app = createApp(createDatabasePool(connectionString), process.env.WEB_ORIGIN)
+const app = createApp(createDatabasePool(connectionString), process.env.WEB_ORIGIN, (line) => console.log(line))
 
 createServer(app).listen(port, '0.0.0.0', () => {
   console.log(`CaféClick API listening on port ${port}`)
