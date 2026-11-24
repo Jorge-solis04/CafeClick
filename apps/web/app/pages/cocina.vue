@@ -1,12 +1,25 @@
 <script setup lang="ts">
 import { useOrdersStore } from '~/stores/orders'
-import type { Order } from '~/types/order'
+import type { Order, OrderStatus } from '~/types/order'
 
 definePageMeta({ allowedRoles: ['kitchen'] })
 
 const ordersStore = useOrdersStore()
-const timeFormatter = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' })
-const placeholderCards = [1, 2, 3]
+const now = useNow()
+const placeholderTickets = [1, 2, 3]
+const confirmWindowMs = 5000
+const toastDurationMs = 8000
+
+const kitchenColumns: { status: OrderStatus, title: string, empty: string }[] = [
+  { status: 'pending', title: 'Por preparar', empty: 'Sin pedidos nuevos.' },
+  { status: 'preparing', title: 'En preparación', empty: 'Nada en preparación.' },
+  { status: 'ready', title: 'Listos para entregar', empty: 'Nada esperando a ser recogido.' },
+]
+
+const confirmingDeliveryId = ref<number | null>(null)
+const toastMessage = ref<string | null>(null)
+let confirmTimer: ReturnType<typeof setTimeout> | null = null
+let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 const showInitialLoading = computed(() => (
   (ordersStore.listStatus === 'idle' || ordersStore.listStatus === 'loading') && ordersStore.orders.length === 0
@@ -15,8 +28,24 @@ const showLoadError = computed(() => ordersStore.listStatus === 'error' && order
 const showEmpty = computed(() => ordersStore.listStatus === 'ready' && ordersStore.orders.length === 0)
 const showStaleNotice = computed(() => ordersStore.errorMessage !== null && ordersStore.orders.length > 0)
 
-function receivedAt(order: Order) {
-  return timeFormatter.format(new Date(order.createdAt))
+const columns = computed(() => kitchenColumns.map((column) => ({
+  ...column,
+  orders: ordersStore.orders.filter((order) => order.status === column.status),
+})))
+
+useHead({
+  title: computed(() => {
+    const count = ordersStore.highlightedIds.length
+    return count > 0 ? `(${count}) Cocina · CaféClick` : 'Cocina · CaféClick'
+  }),
+})
+
+function clearConfirmation() {
+  if (confirmTimer !== null) {
+    clearTimeout(confirmTimer)
+    confirmTimer = null
+  }
+  confirmingDeliveryId.value = null
 }
 
 async function advance(order: Order) {
@@ -25,23 +54,68 @@ async function advance(order: Order) {
     return
   }
 
+  // Delivery can't be undone, so it takes a second click within a few seconds.
+  if (next === 'delivered' && confirmingDeliveryId.value !== order.id) {
+    clearConfirmation()
+    confirmingDeliveryId.value = order.id
+    confirmTimer = setTimeout(clearConfirmation, confirmWindowMs)
+    return
+  }
+
+  clearConfirmation()
   await ordersStore.advanceStatus(order.id, next)
 }
 
 function reload() {
   void ordersStore.fetchOrders('kitchen')
 }
+
+function dismissToast() {
+  if (toastTimer !== null) {
+    clearTimeout(toastTimer)
+    toastTimer = null
+  }
+  toastMessage.value = null
+}
+
+watch(() => ordersStore.lastArrival, (arrival) => {
+  if (!arrival) {
+    return
+  }
+
+  const [firstId] = arrival.orderIds
+  toastMessage.value = arrival.orderIds.length === 1
+    ? `Nuevo pedido: folio #${firstId}`
+    : `${arrival.orderIds.length} pedidos nuevos`
+
+  if (toastTimer !== null) {
+    clearTimeout(toastTimer)
+  }
+  toastTimer = setTimeout(dismissToast, toastDurationMs)
+})
+
+watch(() => ordersStore.orders, (orders) => {
+  const confirming = orders.find((order) => order.id === confirmingDeliveryId.value)
+  if (confirmingDeliveryId.value !== null && confirming?.status !== 'ready') {
+    clearConfirmation()
+  }
+})
+
+onBeforeUnmount(() => {
+  clearConfirmation()
+  dismissToast()
+})
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-5 pt-10 pb-20 sm:px-8 lg:pt-14">
+  <div class="mx-auto max-w-7xl px-5 pt-10 pb-20 sm:px-8 lg:pt-14">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <h1 class="font-display text-4xl font-semibold tracking-tight font-stretch-semi-condensed sm:text-5xl">
           Cocina
         </h1>
         <p class="mt-2 max-w-prose text-muted">
-          Pedidos por entregar, del que lleva más tiempo esperando al más reciente.
+          En cada columna, el pedido que lleva más tiempo esperando va primero.
         </p>
       </div>
 
@@ -66,22 +140,17 @@ function reload() {
       </button>
     </div>
 
-    <ul v-if="showInitialLoading" aria-busy="true" class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <li class="sr-only">
-        Cargando pedidos…
-      </li>
-      <li
-        v-for="card in placeholderCards"
-        :key="card"
-        aria-hidden="true"
-        class="h-56 rounded-lg border border-line bg-surface p-5"
-      >
-        <span class="block h-7 w-28 rounded-sm bg-ink/10" />
-        <span class="mt-5 block h-4 w-40 rounded-sm bg-ink/5" />
-        <span class="mt-2 block h-4 w-32 rounded-sm bg-ink/5" />
-        <span class="mt-10 block h-10 rounded-md bg-ink/5" />
-      </li>
-    </ul>
+    <div v-if="showInitialLoading" aria-busy="true" class="mt-8 grid gap-6 lg:grid-cols-3">
+      <span class="sr-only">Cargando pedidos…</span>
+      <div v-for="ticket in placeholderTickets" :key="ticket" aria-hidden="true" class="ticket-shadow">
+        <div class="ticket-edge h-72 bg-surface p-5">
+          <span class="block h-12 w-24 rounded-sm bg-ink/10" />
+          <span class="mt-8 block h-5 w-48 rounded-sm bg-ink/5" />
+          <span class="mt-3 block h-5 w-40 rounded-sm bg-ink/5" />
+          <span class="mt-12 block h-12 rounded-md bg-ink/5" />
+        </div>
+      </div>
+    </div>
 
     <div v-else-if="showLoadError" role="alert" class="mt-8 border-l-2 border-marigold py-1 pl-4">
       <p class="font-semibold">
@@ -103,61 +172,42 @@ function reload() {
       No hay pedidos por atender. Los nuevos aparecerán aquí automáticamente.
     </p>
 
-    <ul v-else class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <li
-        v-for="order in ordersStore.orders"
-        :key="order.id"
-        class="flex flex-col justify-between rounded-lg border bg-surface p-5"
-        :class="order.status === 'ready' ? 'border-leaf' : 'border-line'"
+    <div v-else class="mt-8 grid items-start gap-x-6 gap-y-10 lg:grid-cols-3">
+      <section
+        v-for="column in columns"
+        :key="column.status"
+        :aria-labelledby="`column-${column.status}`"
+        class="rounded-lg bg-ink/[0.04] p-3 sm:p-4"
       >
-        <div>
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h2 class="font-display text-2xl font-semibold tracking-tight tabular-nums">
-                Folio #{{ order.id }}
-              </h2>
-              <p class="text-xs tabular-nums text-muted">
-                Recibido a las {{ receivedAt(order) }}
-                <span class="ml-2">v{{ order.version }}</span>
-              </p>
-            </div>
-            <OrderStatusBadge :status="order.status" />
-          </div>
+        <h2
+          :id="`column-${column.status}`"
+          class="flex items-baseline justify-between border-b-4 border-ink/80 px-1 pb-2 font-display text-2xl font-semibold tracking-tight font-stretch-semi-condensed"
+        >
+          {{ column.title }}
+          <span class="text-lg tabular-nums text-muted">{{ column.orders.length }}</span>
+        </h2>
 
-          <ul class="mt-4 space-y-1 border-t border-line pt-3 text-sm">
-            <li v-for="item in order.items" :key="item.productId" class="flex justify-between gap-3">
-              <span><span class="font-semibold tabular-nums">{{ item.quantity }} ×</span> {{ item.name }}</span>
-              <span class="tabular-nums text-muted">{{ formatCents(priceToCents(item.unitPrice) * item.quantity) }}</span>
-            </li>
-          </ul>
-        </div>
+        <p v-if="column.orders.length === 0" class="px-1 py-6 text-sm text-muted">
+          {{ column.empty }}
+        </p>
 
-        <div class="mt-5 border-t border-line pt-4">
-          <div class="flex items-baseline justify-between">
-            <span class="text-sm text-muted">Total</span>
-            <span class="font-display text-lg font-semibold tabular-nums">{{ formatPrice(order.total) }}</span>
-          </div>
+        <ul v-else class="mt-4 space-y-5">
+          <li v-for="order in column.orders" :key="order.id">
+            <KitchenTicket
+              :order="order"
+              :now="now"
+              :highlighted="ordersStore.isHighlighted(order.id)"
+              :advancing="ordersStore.isAdvancing(order.id)"
+              :confirming="confirmingDeliveryId === order.id"
+              :error="ordersStore.advanceErrorFor(order.id)"
+              @advance="advance(order)"
+              @cancel="clearConfirmation"
+            />
+          </li>
+        </ul>
+      </section>
+    </div>
 
-          <button
-            v-if="nextOrderActionLabel(order.status)"
-            type="button"
-            :disabled="ordersStore.isAdvancing(order.id)"
-            :aria-busy="ordersStore.isAdvancing(order.id)"
-            class="mt-4 h-10 w-full rounded-md bg-leaf px-4 text-sm font-semibold text-white hover:bg-leaf-strong disabled:cursor-not-allowed disabled:opacity-60"
-            @click="advance(order)"
-          >
-            {{ ordersStore.isAdvancing(order.id) ? 'Actualizando…' : nextOrderActionLabel(order.status) }}
-          </button>
-
-          <p
-            v-if="ordersStore.advanceErrorFor(order.id)"
-            role="alert"
-            class="mt-3 border-l-2 border-marigold pl-3 text-sm"
-          >
-            {{ ordersStore.advanceErrorFor(order.id) }}
-          </p>
-        </div>
-      </li>
-    </ul>
+    <NewOrderToast :message="toastMessage" @dismiss="dismissToast" />
   </div>
 </template>

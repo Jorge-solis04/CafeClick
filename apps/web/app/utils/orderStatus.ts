@@ -41,9 +41,16 @@ export type OrderProgressStep = {
 
 const statusSequence: OrderStatus[] = ['pending', 'preparing', 'ready', 'delivered']
 
+const customerStatusTitles: Record<OrderStatus, string> = {
+  pending: 'Pedido recibido',
+  preparing: 'Preparando tu pedido',
+  ready: '¡Listo para recoger!',
+  delivered: 'Pedido entregado',
+}
+
 const customerStatusHints: Record<OrderStatus, string> = {
   pending: 'Recibimos tu pedido. Cocina lo empezará en breve.',
-  preparing: 'Cocina está preparando tu pedido.',
+  preparing: 'Tu pedido ya está en manos de cocina.',
   ready: 'Tu pedido está listo. Pasa a recogerlo y muestra tu folio.',
   delivered: 'Ya recogiste este pedido. ¡Buen provecho!',
 }
@@ -56,6 +63,10 @@ export function orderProgressSteps(status: OrderStatus): OrderProgressStep[] {
     label: orderStatusLabels[step],
     state: index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'upcoming',
   }))
+}
+
+export function customerStatusTitle(status: OrderStatus) {
+  return customerStatusTitles[status]
 }
 
 export function customerStatusHint(status: OrderStatus) {

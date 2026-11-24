@@ -55,3 +55,8 @@ export function buildOrderStreamUrl(apiBase: string, ticket: string) {
   const base = apiBase.replace(/\/+$/, '')
   return `${base}/api/orders/stream?ticket=${encodeURIComponent(ticket)}`
 }
+
+export function findNewPendingOrderIds(previous: Order[], next: Order[]): number[] {
+  const known = new Set(previous.map((order) => order.id))
+  return next.filter((order) => order.status === 'pending' && !known.has(order.id)).map((order) => order.id)
+}
