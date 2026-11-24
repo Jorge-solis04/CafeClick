@@ -4,4 +4,3 @@ packages:
 
 allowBuilds:
   esbuild: true
-  pnpm: true
